@@ -66,15 +66,22 @@ export function GeneratorPanel() {
       <div className="grid gap-4 xl:grid-cols-2">
         <PlatformCard title="B站" icon="B">
           <List title="视频标题 5 个" items={content.bilibili.titles} />
+          <Block title="推荐分区" body={content.bilibili.recommendedSection} />
+          <Block title="推荐视频时长" body={content.bilibili.recommendedDuration} />
           <Block title="视频开头 30 秒脚本" body={content.bilibili.openingScript} />
           <List title="视频结构大纲" items={content.bilibili.outline} />
-          <Block title="弹幕 / 评论区互动话术" body={content.bilibili.commentPrompt} />
-          <Block title="推荐 UP 主类型" body={content.bilibili.creatorType} />
+          <List title="封面关键词" items={content.bilibili.coverKeywords} />
           <Block title="封面文案建议" body={content.bilibili.coverCopy} />
+          <List title="弹幕互动点" items={content.bilibili.danmakuPoints} />
+          <Block title="评论区置顶话术" body={content.bilibili.pinnedComment} />
+          <Block title="适合约稿 UP 主类型" body={content.bilibili.creatorType} />
+          <Block title="不适合约稿 UP 主类型" body={content.bilibili.unsuitableCreatorType} />
         </PlatformCard>
 
         <PlatformCard title="小红书" icon="RED">
           <List title="图文标题 5 个" items={content.xiaohongshu.titles} />
+          <Block title="首图文案" body={content.xiaohongshu.firstImageCopy} />
+          <List title="5 页卡片标题" items={content.xiaohongshu.cardTitles} />
           <div>
             <div className="mb-2 text-xs text-slate-300">5 页卡片结构</div>
             <div className="space-y-2">
@@ -87,33 +94,41 @@ export function GeneratorPanel() {
             </div>
           </div>
           <Block title="封面标题" body={content.xiaohongshu.coverTitle} />
+          <Block title="收藏理由" body={content.xiaohongshu.collectReason} />
           <List title="标签建议" items={content.xiaohongshu.tags} />
           <List title="避免用词" items={content.xiaohongshu.avoidWords} />
         </PlatformCard>
 
         <PlatformCard title="微博" icon="WB">
+          <Block title="赛后 5 分钟快评" body={content.weibo.fiveMinuteComment} />
+          <Block title="赛后 30 分钟讨论帖" body={content.weibo.thirtyMinuteDiscussion} />
+          <Block title="争议降风险版本" body={content.weibo.controversySafeVersion} />
           <Block title="100 字快评" body={content.weibo.shortComment} />
-          <Block title="300 字长微博" body={content.weibo.longPost} />
+          <Block title="长微博" body={content.weibo.longPost} />
           <Block title="争议讨论提问" body={content.weibo.debateQuestion} />
           <List title="话题标签" items={content.weibo.hashtags} />
           <Block title="风险提示" body={content.weibo.riskTip} />
         </PlatformCard>
 
         <PlatformCard title="短视频" icon="SV">
+          <Block title="前三秒钩子" body={content.shortVideo.threeSecondHook} />
           <Block title="15 秒版本" body={content.shortVideo.fifteenSec} />
           <Block title="30 秒版本" body={content.shortVideo.thirtySec} />
           <Block title="60 秒版本" body={content.shortVideo.sixtySec} />
           <List title="分镜脚本" items={content.shortVideo.storyboard} />
           <Block title="口播稿" body={content.shortVideo.voiceover} />
+          <List title="画面素材清单" items={content.shortVideo.materialList} />
           <List title="画面建议" items={content.shortVideo.visuals} />
         </PlatformCard>
 
         <PlatformCard title="公众号 / 专栏" icon="DOC">
           <Block title="文章标题" body={content.article.title} />
           <Block title="导语" body={content.article.intro} />
+          <List title="完整文章大纲" items={content.article.fullOutline} />
           <List title="文章结构" items={content.article.structure} />
           <List title="小标题" items={content.article.subheads} />
           <Block title="结尾观点" body={content.article.ending} />
+          <List title="图表插入位置" items={content.article.chartPlacements} />
           <List title="数据图表插入建议" items={content.article.chartSuggestions} />
         </PlatformCard>
 
@@ -181,17 +196,23 @@ function createMarkdown(matchName: string, topicTitle: string, content: ReturnTy
     "",
     "## B站",
     ...content.bilibili.titles.map((item) => `- ${item}`),
+    `- 推荐分区：${content.bilibili.recommendedSection}`,
+    `- 推荐时长：${content.bilibili.recommendedDuration}`,
     "",
     "## 小红书",
     ...content.xiaohongshu.cards.map((item, index) => `${index + 1}. ${item.title}：${item.body}`),
+    `收藏理由：${content.xiaohongshu.collectReason}`,
     "",
     "## 微博",
-    content.weibo.shortComment,
+    content.weibo.fiveMinuteComment,
+    content.weibo.thirtyMinuteDiscussion,
     "",
     "## 短视频",
+    content.shortVideo.threeSecondHook,
     content.shortVideo.thirtySec,
     "",
     "## 公众号 / 专栏",
-    content.article.title
+    content.article.title,
+    ...content.article.fullOutline.map((item) => `- ${item}`)
   ].join("\n");
 }

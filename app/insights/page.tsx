@@ -16,6 +16,10 @@ export default function InsightsPage() {
   const match = exampleMatches.find((item) => item.id === matchId) ?? exampleMatches[0];
   const shootingEfficiencyA = Math.round((match.stats.teamA.shotsOnTarget / Math.max(match.stats.teamA.shots, 1)) * 100);
   const shootingEfficiencyB = Math.round((match.stats.teamB.shotsOnTarget / Math.max(match.stats.teamB.shots, 1)) * 100);
+  const possessionLeader = match.stats.teamA.possession >= match.stats.teamB.possession ? match.teamA : match.teamB;
+  const shotLeader = match.stats.teamA.shotsOnTarget >= match.stats.teamB.shotsOnTarget ? match.teamA : match.teamB;
+  const xgGap = Math.abs(match.stats.teamA.xg - match.stats.teamB.xg).toFixed(1);
+  const yellowTotal = match.stats.teamA.yellowCards + match.stats.teamB.yellowCards;
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -69,9 +73,10 @@ export default function InsightsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-7 text-slate-200">
-            <AlertCard title="射正效率差异" body={`${match.teamA}射正率 ${shootingEfficiencyA}%，${match.teamB}射正率 ${shootingEfficiencyB}%。如果射正效率明显高于射门数量，可以从“机会质量”切入。`} />
-            <AlertCard title="xG 与比分关系" body={`${match.teamA} xG ${match.stats.teamA.xg}，${match.teamB} xG ${match.stats.teamB.xg}。如果 xG 与比分差异明显，适合讨论终结效率或门将表现。`} />
-            <AlertCard title="犯规与黄牌" body="犯规和黄牌只能提示比赛强度，不能直接推断恶意动作，发布前建议结合具体画面和裁判报告。" />
+            <AlertCard title="控球与威胁不完全同步" body={`${possessionLeader}控球更多，但射正领先方是${shotLeader}。这说明运营文案要把“控球”和“威胁”拆开讲。`} />
+            <AlertCard title="射正效率可做短视频钩子" body={`${match.teamA}射正率 ${shootingEfficiencyA}%，${match.teamB}射正率 ${shootingEfficiencyB}%。如果做短视频，建议用“射正率解释比赛观感”作为前三秒钩子。`} />
+            <AlertCard title="xG 差距需要补来源" body={`${match.teamA} xG ${match.stats.teamA.xg}，${match.teamB} xG ${match.stats.teamB.xg}，差距 ${xgGap}。正式发布时应标注数据源。`} />
+            <AlertCard title="黄牌和犯规只做强度提示" body={`本场共 ${yellowTotal} 张黄牌，${match.teamA}犯规 ${match.stats.teamA.fouls} 次，${match.teamB}犯规 ${match.stats.teamB.fouls} 次。不要直接推断恶意动作。`} />
           </CardContent>
         </Card>
       </div>

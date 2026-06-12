@@ -29,7 +29,7 @@ export default function TopicEnginePage() {
         <Badge variant="warning" className="mb-5">Topic Engine</Badge>
         <h1 className="text-4xl font-semibold tracking-normal lg:text-6xl">选题引擎</h1>
         <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-100">
-          根据比赛数据生成差异化选题，并评估新闻价值、平台适配度、制作难度和发布风险。
+          根据比赛数据生成热点选题，并给出主推、次推、观察和谨慎发布四类运营建议。
         </p>
       </section>
 
@@ -80,7 +80,8 @@ function TopicCard({ topic, selected, onSelect }: { topic: TopicIdea; selected: 
     <Card className={selected ? "border-emerald-300/40" : ""}>
       <CardHeader>
         <div className="flex flex-wrap gap-2">
-          <Badge>{topic.category}</Badge>
+          <Badge>{topic.recommendation}</Badge>
+          <Badge variant="secondary">{topic.category}</Badge>
           <Badge variant={topic.riskLevel === "高" ? "destructive" : topic.riskLevel === "中" ? "warning" : "success"}>
             {topic.riskLevel}风险
           </Badge>
@@ -95,14 +96,27 @@ function TopicCard({ topic, selected, onSelect }: { topic: TopicIdea; selected: 
         <p className="text-base">{topic.coreAngle}</p>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
           <Metric label="新闻价值" value={topic.newsValue} />
+          <Metric label="传播潜力" value={topic.spreadPotential} />
+          <Metric label="平台适配" value={topic.platformFit} />
           <Metric label="B站" value={topic.bilibiliFit} />
-          <Metric label="小红书" value={topic.xiaohongshuFit} />
-          <Metric label="微博" value={topic.weiboFit} />
           <Metric label="短视频" value={topic.shortVideoFit} />
+        </div>
+        <div className="grid gap-2 md:grid-cols-3">
+          <InfoPill label="制作成本" value={topic.productionCost} />
+          <InfoPill label="小红书适配" value={`${topic.xiaohongshuFit}`} />
+          <InfoPill label="微博适配" value={`${topic.weiboFit}`} />
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
           <div className="text-xs text-slate-300">推荐内容形式</div>
           <div className="mt-1 font-semibold text-white">{topic.recommendedFormat}</div>
+        </div>
+        <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/[0.08] p-4">
+          <div className="text-xs text-emerald-100">评分理由</div>
+          <p className="mt-1 text-slate-100">{topic.scoreReason}</p>
+        </div>
+        <div className="rounded-2xl border border-amber-300/20 bg-amber-300/[0.08] p-4">
+          <div className="text-xs text-amber-100">为什么推荐这个选题</div>
+          <p className="mt-1 text-slate-100">{topic.businessExplanation}</p>
         </div>
         <p><span className="font-semibold text-white">选题理由：</span>{topic.reason}</p>
         <div>
@@ -126,6 +140,15 @@ function Metric({ label, value }: { label: string; value: number }) {
     <div className="rounded-xl border border-white/10 bg-white/[0.06] p-3">
       <div className="text-[11px] text-slate-300">{label}</div>
       <div className="mt-1 text-xl font-semibold text-white">{value}</div>
+    </div>
+  );
+}
+
+function InfoPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.055] p-3">
+      <div className="text-[11px] text-slate-300">{label}</div>
+      <div className="mt-1 text-sm font-semibold text-white">{value}</div>
     </div>
   );
 }

@@ -30,7 +30,7 @@ export default function RiskReviewPage() {
         <Badge variant="warning" className="mb-5">Risk Review</Badge>
         <h1 className="text-4xl font-semibold tracking-normal lg:text-6xl">风险审稿</h1>
         <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-100">
-          粘贴标题或稿件，检测体育内容发布风险。系统不判断真假，只提示需核实、建议补充来源和建议人工确认的内容。
+          粘贴标题或稿件，检测体育内容发布风险。系统不判断真假，命中风险句后按风险类型生成整句安全改写。
         </p>
       </section>
 
@@ -68,10 +68,16 @@ export default function RiskReviewPage() {
             {result.findings.length > 0 ? (
               result.findings.map((finding, index) => (
                 <div key={`${finding.sentence}-${index}`} className="rounded-2xl border border-amber-300/20 bg-amber-300/[0.08] p-4 text-sm leading-7 text-slate-100">
-                  <Badge variant="warning">{finding.type}</Badge>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="warning">{finding.type}</Badge>
+                    <Badge variant={finding.level === "高" ? "destructive" : finding.level === "中" ? "warning" : "success"}>
+                      {finding.level}风险
+                    </Badge>
+                  </div>
                   <div className="mt-3 text-white">风险句：{finding.sentence}</div>
                   <div className="mt-2">风险原因：{finding.reason}</div>
-                  <div className="mt-2 text-emerald-100">更安全改写：{finding.rewrite}</div>
+                  <div className="mt-2 text-emerald-100">安全改写：{finding.rewrite}</div>
+                  <div className="mt-2 text-slate-100">平台发布建议：{finding.publishAdvice}</div>
                 </div>
               ))
             ) : (

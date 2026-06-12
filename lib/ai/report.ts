@@ -1,81 +1,79 @@
 import type { KnowledgeEntry } from "@/data/knowledge";
 import type { MatchData } from "@/data/matches";
 import type { PlatformContent } from "@/lib/ai/content";
+import { cleanText, qualityControl } from "@/lib/ai/quality";
 import type { RiskReviewResult } from "@/lib/ai/risk";
 import type { TopicIdea } from "@/lib/ai/topics";
 
-export function createMarkdownReport({
-  match,
-  topics,
-  content,
-  risk,
-  knowledge
-}: {
+type ReportInput = {
   match: MatchData;
   topics: TopicIdea[];
   content: PlatformContent;
   risk: RiskReviewResult;
   knowledge: KnowledgeEntry;
-}) {
-  const topTopic = topics[0];
+};
 
-  return [
-    `# ${match.name} 内容运营方案`,
+const cadence = [
+  ["赛后 5 分钟", "微博快评", "值班编辑", "事实边界、比分、关键事件"],
+  ["赛后 30 分钟", "短视频复盘", "短视频编导", "口播是否夸大、素材版权"],
+  ["赛后 2 小时", "B站深度复盘", "体育作者 / UP 主", "数据来源、战术表述"],
+  ["次日", "公众号 / 专栏", "主笔编辑", "历史资料、图表口径、合规表述"]
+];
+
+export function createMarkdownReport(input: ReportInput) {
+  const { match, topics, content, risk, knowledge } = input;
+  const topTopic = topics[0];
+  const safeTopics = qualityControl(topics);
+
+  const lines = [
+    `# ${match.name} 赛事热点拆解与多平台分发方案`,
     "",
-    "## 今日核心判断",
-    `${match.name} 不是单纯赛果报道，而是一场同时具备人物叙事、战术复盘、数据异常和发布风险管理价值的内容样本。建议以“${topTopic.title}”作为主推选题，再用数据图表和平台改写支撑完整传播链路。`,
+    "## 核心结论",
+    `${match.name} 的内容主线应围绕“${topTopic.title}”展开。它兼具人物叙事、历史意义和平台传播价值，适合作为主推选题。战术复盘和数据异常作为证据层，风险审稿作为发布前闸口。`,
     "",
-    "## 比赛基本信息",
+    "## 比赛信息",
     `- 阶段：${match.stage}`,
     `- 时间：${match.time}`,
     `- 对阵：${match.teamA} vs ${match.teamB}`,
     `- 比分：${match.score}${match.penaltyScore ? `，点球 ${match.penaltyScore}` : ""}`,
-    `- 数据来源：示例数据，正式发布前需替换为授权体育数据或公开统计口径。`,
+    "- 数据来源：示例数据。正式发布前需替换为授权体育数据或公开统计口径。",
     "",
-    "## 核心赛事摘要",
-    match.summary,
+    "## 内容优先级",
+    ...safeTopics.slice(0, 6).map((topic, index) => `${index + 1}. ${topic.recommendation}｜${topic.title}｜新闻价值 ${topic.newsValue}｜传播潜力 ${topic.spreadPotential}｜风险 ${topic.riskLevel}｜${topic.businessExplanation}`),
     "",
-    "## 推荐主推选题",
-    `**${topTopic.title}**`,
-    `- 核心角度：${topTopic.coreAngle}`,
-    `- 新闻价值：${topTopic.newsValue}`,
-    `- 推荐形式：${topTopic.recommendedFormat}`,
-    `- 风险提示：${topTopic.riskLevel}风险，发布前仍需人工复核事实和数据来源。`,
+    "## 平台分发策略",
+    `- B站：${content.bilibili.titles[0]}。分区建议：${content.bilibili.recommendedSection}；时长建议：${content.bilibili.recommendedDuration}。`,
+    `- 小红书：${content.xiaohongshu.firstImageCopy}。核心目标是收藏和非球迷理解，收藏理由：${content.xiaohongshu.collectReason}`,
+    `- 微博：${content.weibo.fiveMinuteComment} 30 分钟后切换到讨论帖：${content.weibo.thirtyMinuteDiscussion}`,
+    `- 短视频：前三秒钩子为“${content.shortVideo.threeSecondHook}”，素材优先准备比分图、球员特写和数据图。`,
+    `- 公众号 / 专栏：${content.article.title}。建议按完整文章大纲推进，图表插入位置写入执行清单。`,
     "",
-    "## 推荐选题 Top 5",
-    ...topics.slice(0, 5).map((topic, index) => `${index + 1}. ${topic.title}｜${topic.category}｜新闻价值 ${topic.newsValue}｜B站 ${topic.bilibiliFit}｜小红书 ${topic.xiaohongshuFit}｜微博 ${topic.weiboFit}｜短视频 ${topic.shortVideoFit}`),
-    "",
-    "## 推荐平台打法",
-    `- B站：${content.bilibili.titles[0]}。重点做深度复盘、分段结构和弹幕互动。`,
-    `- 小红书：${content.xiaohongshu.coverTitle}。重点做 5 页卡片和可收藏模板。`,
-    `- 微博：${content.weibo.shortComment}。重点做快评、话题标签和讨论钩子。`,
-    `- 短视频：${content.shortVideo.thirtySec}。重点做比分定格、关键镜头和 30 秒口播。`,
-    `- 公众号 / 专栏：${content.article.title}。重点做完整论证和图表插入。`,
-    "",
-    "## 数据图表使用建议",
-    "- 控球率对比图：用于解释“控球不等于控制比赛”。",
-    "- 射门 / 射正柱状图：用于解释机会数量与机会质量。",
-    "- 关键球员雷达图：用于支撑人物叙事，不要只写进球。",
-    "- 比赛事件时间线：用于提炼 3 个传播转折点。",
-    "- 历史交锋小图表：用于补足背景，但不要把历史结果直接推导成本场结论。",
-    "",
-    "## 风险注意事项",
-    `- 当前审稿等级：${risk.level}`,
-    `- 风险分数：${risk.score}`,
-    `- 发布建议：${risk.advice}`,
-    "- 避免使用“裁判黑哨”“某球员彻底废了”“某队靠黑幕夺冠”“全网都在骂”“确认伤退”等定性表达。",
-    "- 涉及伤病、判罚、争议和数据时，建议使用“需核实”“建议补充来源”“建议人工确认”。",
-    "",
-    "## 知识库补充资料",
-    knowledge.answer,
+    "## 数据洞察",
+    `- 控球率：${match.teamA} ${match.stats.teamA.possession}%，${match.teamB} ${match.stats.teamB.possession}%。运营解释应强调控球不等于控制比赛。`,
+    `- 射门 / 射正：${match.teamA} ${match.stats.teamA.shots}/${match.stats.teamA.shotsOnTarget}，${match.teamB} ${match.stats.teamB.shots}/${match.stats.teamB.shotsOnTarget}。可用来解释机会质量。`,
+    `- xG：${match.teamA} ${match.stats.teamA.xg}，${match.teamB} ${match.stats.teamB.xg}。适合放在公众号和 B站深度复盘中。`,
+    "- 时间线：用关键事件做短视频节奏点，不要只罗列比分。",
     "",
     "## 发布节奏",
-    "- 赛后 5 分钟：微博快评，先发事实和讨论问题。",
-    "- 赛后 30 分钟：短视频复盘，抓关键镜头和一个数据点。",
-    "- 赛后 2 小时：B站深度复盘，加入图表、时间线和人物对照。",
-    "- 次日：公众号 / 专栏长文，沉淀完整方案和历史背景。",
+    ...cadence.map(([time, type, owner, review]) => `- ${time}：${type}｜负责人：${owner}｜审核重点：${review}`),
+    "",
+    "## 风险审稿",
+    `- 当前风险等级：${risk.level}`,
+    `- 风险分数：${risk.score}`,
+    `- 发布建议：${risk.advice}`,
+    ...risk.findings.slice(0, 5).map((finding) => `- ${finding.type}｜${finding.level}风险｜建议：${finding.rewrite}`),
+    "",
+    "## 执行清单",
+    "| 内容类型 | 负责人角色 | 发布时间 | 审核重点 |",
+    "| --- | --- | --- | --- |",
+    ...cadence.map(([time, type, owner, review]) => `| ${type} | ${owner} | ${time} | ${review} |`),
+    "",
+    "## 知识库补充",
+    knowledge.answer,
     "",
     "## 合规说明",
-    "当前报告基于示例数据、本地 mock 知识库和规则生成，用于演示工作流。正式发布前必须人工复核事实、数据来源、素材版权和平台规则。"
-  ].join("\n");
+    "当前报告基于示例数据、本地 mock 知识库和规则生成，用于演示工作流。正式发布前必须人工复核事实、数据来源、素材版权和平台规则。涉及伤病、判罚和争议时，使用“需核实”“建议补充来源”“建议人工确认”等表达。"
+  ];
+
+  return cleanText(lines.map((line) => cleanText(line)).join("\n"));
 }
