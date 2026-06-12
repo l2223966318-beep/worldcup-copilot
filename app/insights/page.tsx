@@ -27,7 +27,7 @@ export default function InsightsPage() {
         <Badge variant="warning" className="mb-5">Data Insight</Badge>
         <h1 className="text-4xl font-semibold tracking-normal lg:text-6xl">数据洞察</h1>
         <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-100">
-          基于赛事数据生成图表和 AI 解说，把技术统计转成可直接用于内容创作的解释。
+          基于赛事数据生成图表、运营解释和可复制口播金句，把技术统计转成可直接用于内容创作的素材。
         </p>
       </section>
 

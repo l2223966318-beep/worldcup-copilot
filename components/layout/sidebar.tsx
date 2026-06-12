@@ -42,7 +42,7 @@ export function Sidebar() {
         </div>
         <div>
           <div className="text-lg font-semibold tracking-normal text-white">WorldCup Copilot</div>
-          <div className="mt-1 text-xs text-slate-300">AI 世界杯内容助手</div>
+          <div className="mt-1 text-xs text-slate-300">赛事热点拆解与分发工作台</div>
         </div>
       </Link>
 
