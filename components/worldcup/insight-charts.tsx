@@ -34,6 +34,7 @@ export function InsightCharts({ match, theme = getSportTheme("football") }: { ma
     { name: "射正", [match.teamA]: match.stats.teamA.shotsOnTarget, [match.teamB]: match.stats.teamB.shotsOnTarget }
   ];
   const radarPlayer = match.keyPlayers[0];
+  const isTeamSubject = radarPlayer.role === "球队";
   const playerRadar = [
     { metric: "进球", value: radarPlayer.goals * 30 + 40 },
     { metric: "射门", value: radarPlayer.shots * 12 },
@@ -45,6 +46,13 @@ export function InsightCharts({ match, theme = getSportTheme("football") }: { ma
     name: item.year,
     场次: index + 1
   }));
+  const radarTitle = isTeamSubject ? "球队表现雷达：这条比赛线是否站得住" : "关键球员雷达：人物叙事是否站得住";
+  const radarOperation = isTeamSubject
+    ? `${radarPlayer.name}射门 ${radarPlayer.shots} 次、进球 ${radarPlayer.goals} 个。雷达图适合放在球队走势段，说明这条内容线是否有数据支撑。`
+    : `${radarPlayer.name}评分 ${radarPlayer.rating}，进球 ${radarPlayer.goals}，关键传球 ${radarPlayer.keyPasses}。雷达图适合放在人物叙事段，证明主角不是靠单一镜头成立。`;
+  const radarQuote = isTeamSubject
+    ? `${radarPlayer.name}这条内容线不能只看比分，要看它在射门、控球和机会质量里的位置。`
+    : `${radarPlayer.name}的价值不只在进球，也在他把比赛叙事串了起来。`;
 
   return (
     <div className="grid gap-5 xl:grid-cols-2">
@@ -66,7 +74,7 @@ export function InsightCharts({ match, theme = getSportTheme("football") }: { ma
       </ChartCard>
 
       <ChartCard
-        title="射门 / 射正：神级决赛的机会密度"
+        title="射门 / 射正：比赛机会密度怎么讲"
         operation={`${match.teamA}射门 ${match.stats.teamA.shots} 次、射正 ${match.stats.teamA.shotsOnTarget} 次；${match.teamB}射门 ${match.stats.teamB.shots} 次、射正 ${match.stats.teamB.shotsOnTarget} 次。这个图适合解释场面热闹和真实威胁的差别。`}
         quote="别只看射门数，真正决定内容角度的是射正率和机会质量。"
         theme={theme}
@@ -85,9 +93,9 @@ export function InsightCharts({ match, theme = getSportTheme("football") }: { ma
       </ChartCard>
 
       <ChartCard
-        title="关键球员雷达：人物叙事是否站得住"
-        operation={`${radarPlayer.name}评分 ${radarPlayer.rating}，进球 ${radarPlayer.goals}，关键传球 ${radarPlayer.keyPasses}。雷达图适合放在人物叙事段，证明主角不是靠单一镜头成立。`}
-        quote={`${radarPlayer.name}的价值不只在进球，也在他把比赛叙事串了起来。`}
+        title={radarTitle}
+        operation={radarOperation}
+        quote={radarQuote}
         theme={theme}
       >
         <ResponsiveContainer width="100%" height={270}>
@@ -102,9 +110,9 @@ export function InsightCharts({ match, theme = getSportTheme("football") }: { ma
       </ChartCard>
 
       <ChartCard
-        title="历史交锋：为什么这场会被反复讨论"
-        operation={`${match.teamA}和${match.teamB}有 ${match.historicalMeetings.length} 条示例历史交锋。它适合放在长文或 B站视频中段，用来抬高内容纵深。`}
-        quote="历史不是本场比赛的答案，但能解释为什么这场球会被反复讨论。"
+        title="赛事背景：这场比赛如何放进内容上下文"
+        operation={`${match.teamA}和${match.teamB}当前有 ${match.historicalMeetings.length} 条可用背景记录。它适合放在长文或 B站视频中段，用来补充赛程、场馆和历史语境。`}
+        quote="背景信息不是本场比赛的答案，但能帮助观众理解这场球为什么值得被拆解。"
         theme={theme}
       >
         <ResponsiveContainer width="100%" height={250}>
