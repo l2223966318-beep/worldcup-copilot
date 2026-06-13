@@ -49,6 +49,7 @@ type AiWorkflowEnhancement = {
   message?: string;
   conclusions: Array<{ title: string; body: string; featured?: boolean }>;
   topics: TopicIdea[];
+  platformContent?: PlatformContent;
 };
 
 const platformMeta: Record<PlatformKey, { title: string; positioning: string; action: string }> = {
@@ -81,7 +82,15 @@ export default function MatchAnalysisPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [rewriteApplied, setRewriteApplied] = useState<string | null>(null);
 
-  const content = useMemo(() => generatePlatformContent(match, selectedTopic), [match, selectedTopic]);
+  const localContent = useMemo(() => generatePlatformContent(match, selectedTopic), [match, selectedTopic]);
+  const content = useMemo(() => {
+    const aiPrimaryTopicId = aiEnhancement?.topics[0]?.id;
+    if (aiEnhancement?.sourceStatus === "live" && aiEnhancement.platformContent && selectedTopic.id === aiPrimaryTopicId) {
+      return aiEnhancement.platformContent;
+    }
+
+    return localContent;
+  }, [aiEnhancement, localContent, selectedTopic.id]);
   const selectedText = useMemo(() => buildSelectedContent(content, ["bilibili", "weibo", "xiaohongshu", "article"]), [content]);
   const risk = useMemo(() => reviewRisk(selectedText), [selectedText]);
   const markdown = useMemo(() => buildMarkdown(match.name, selectedTopic, content, risk.advice), [content, match.name, risk.advice, selectedTopic]);
@@ -380,10 +389,15 @@ function AiBrainStatus({
 }) {
   const isLive = enhancement?.sourceStatus === "live";
   const label = loading ? "DeepSeek 增强中" : isLive ? `DeepSeek 已启用${enhancement?.model ? `｜${enhancement.model}` : ""}` : "本地规则引擎兜底";
+  const liveModules = [
+    enhancement?.conclusions.length ? "运营结论" : null,
+    enhancement?.topics.length ? "选题推荐" : null,
+    enhancement?.platformContent ? "平台内容预览" : null
+  ].filter(Boolean).join("、");
   const description = loading
-    ? "正在把真实比赛数据转成运营结论、选题参考和平台分发建议。"
+    ? "正在把真实比赛数据转成运营结论、选题参考、平台内容预览和分发建议。"
     : isLive
-      ? "当前页面的运营结论和选题已由 DS API 增强，硬数据仍来自 API-Football。"
+      ? `当前页面的${liveModules || "运营分析"}由 DS API 实时生成，硬数据来自项目服务端比赛接口。切换到非主推选题时，平台内容会使用本地规则补齐。`
       : enhancement?.message ?? "未配置 DeepSeek key 或接口暂不可用，页面继续使用本地规则引擎。";
 
   return (
