@@ -1,5 +1,6 @@
 import type { MatchData } from "@/data/matches";
 import { qualityControl } from "@/lib/ai/quality";
+import { extractMatchSignals, type MatchSignal } from "@/lib/ai/signals";
 
 export type TopicCategory =
   | "战术复盘"
@@ -37,6 +38,10 @@ export type TopicIdea = {
 };
 
 export function generateTopics(match: MatchData): TopicIdea[] {
+  const signalTopics = extractMatchSignals(match)
+    .filter((signal) => signal.priority !== "watch")
+    .slice(0, 3)
+    .map((signal, index) => signalToTopic(match, signal, index));
   const topPlayer = [...match.keyPlayers].sort((a, b) => b.rating - a.rating)[0];
   const isTeamSubject = topPlayer.role === "球队";
   const leadSubject = isTeamSubject ? `${topPlayer.name}这条比赛线` : topPlayer.name;
@@ -115,7 +120,49 @@ export function generateTopics(match: MatchData): TopicIdea[] {
         })
       ];
 
-  return qualityControl(topics);
+  return qualityControl([...signalTopics, ...topics]);
+}
+
+function signalToTopic(match: MatchData, signal: MatchSignal, index: number): TopicIdea {
+  const isRisky = signal.riskLevel !== "低";
+  const category: TopicCategory =
+    signal.type === "own-goal" || signal.type === "late-winner"
+      ? "平台热点"
+      : signal.type === "wardrobe-incident" || signal.type === "penalty-drama"
+        ? "冷知识科普"
+        : signal.type === "controversial-call" || signal.type === "var-review" || signal.type === "conflict"
+          ? "争议讨论"
+          : signal.type === "injury-concern"
+            ? "平台热点"
+            : "球员叙事";
+
+  return createTopic(match, {
+    id: `signal-${signal.type}-${index + 1}`,
+    title: signal.topicSeed,
+    coreAngle: `${signal.label}是这场比赛最适合转化为传播内容的场上瞬间之一。先讲清楚发生了什么，再解释它如何改变比赛叙事和平台讨论。`,
+    category,
+    recommendation: signal.priority === "primary" ? "主推" : isRisky ? "谨慎发布" : "次推",
+    scores: [
+      Math.min(99, signal.contentValue),
+      Math.min(99, signal.contentValue + 1),
+      Math.min(99, signal.contentValue - 2),
+      signal.recommendedPlatforms.includes("B站") ? 88 : 76,
+      signal.recommendedPlatforms.includes("小红书") ? 88 : 70,
+      signal.recommendedPlatforms.includes("微博") ? 92 : 75,
+      signal.recommendedPlatforms.includes("短视频") ? 94 : 74
+    ],
+    recommendedFormat: signal.contentFormats.join(" + "),
+    difficulty: isRisky ? "中" : "低",
+    productionCost: "低",
+    riskLevel: signal.riskLevel,
+    scoreReason: `来自场上热点信号“${signal.label}”，传播记忆点强，优先级高于普通技术统计。`,
+    businessExplanation: `这个选题不是单纯复盘比分，而是抓住“${signal.evidence}”这个可传播瞬间，适合快速转成平台内容。`,
+    reason: `热点依据：${signal.minute}，${signal.evidence}。表达提示：${signal.angleHints.join("；")}。`,
+    sampleTitles: [
+      signal.topicSeed,
+      `${match.name}这个瞬间，为什么会成为赛后内容爆点？`
+    ]
+  });
 }
 
 function worldCupFinalTopics(match: MatchData): TopicIdea[] {

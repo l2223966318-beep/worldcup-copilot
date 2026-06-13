@@ -2,6 +2,7 @@ import type { MatchData } from "@/data/matches";
 import { generatePlatformContent, type PlatformContent } from "@/lib/ai/content";
 import { generateDeepSeekJson } from "@/lib/ai/deepseek";
 import { qualityControl } from "@/lib/ai/quality";
+import { buildSignalContext } from "@/lib/ai/signals";
 import type { TopicCategory, TopicIdea, TopicRecommendation } from "@/lib/ai/topics";
 
 type DeepSeekTopic = Partial<Omit<TopicIdea, "id">>;
@@ -51,18 +52,19 @@ export async function enhanceMatchWorkflowWithDeepSeek(input: {
   baselineTopics: TopicIdea[];
 }): Promise<MatchWorkflowEnhancement> {
   const { match, baselineTopics } = input;
+  const signalContext = buildSignalContext(match);
   const result = await generateDeepSeekJson<DeepSeekWorkflowResponse>(
     [
       {
         role: "system",
         content:
-          "你是体育赛事内容运营总监。你只输出严格 JSON，不要 Markdown。基于真实比赛数据给出可执行的运营结论、选题、平台策略和平台内容预览。不能编造伤病、采访、内幕、社媒热搜或未提供的事实。涉及不确定信息必须使用“需核实”“建议补充来源”。"
+          "你是体育赛事内容运营总监。你只输出严格 JSON，不要 Markdown。基于真实比赛数据和场上热点信号给出可执行的运营结论、选题、平台策略和平台内容预览。选题优先级是：场上热点事件 > 关键进球事件 > 比分走势 > 球员表现 > 技术统计 > 历史背景。不能编造伤病、采访、内幕、社媒热搜或未提供的事实。涉及不确定信息必须使用“需核实”“建议补充来源”。"
       },
       {
         role: "user",
         content: JSON.stringify({
           task:
-            "增强 WorldCup Copilot 单场比赛工作流。输出 conclusions 3 条、topics 3 条、platformStrategy 和 platformContent。topics 与 platformContent 必须贴合当前比赛，不要套用梅西/姆巴佩等无关样例。",
+            "增强 WorldCup Copilot 单场比赛工作流。输出 conclusions 3 条、topics 3 条、platformStrategy 和 platformContent。必须优先使用 matchSignals 中的乌龙球、球衣被扯破、VAR、争议判罚、冲突、伤病需核实等场上热点信号生成选题；不要只围绕比分或控球率。topics 与 platformContent 必须贴合当前比赛，不要套用梅西/姆巴佩等无关样例。",
           outputShape: {
             conclusions: [{ title: "为什么值得做", body: "80字以内", featured: false }],
             topics: [
@@ -123,6 +125,8 @@ export async function enhanceMatchWorkflowWithDeepSeek(input: {
             }
           },
           match,
+          matchSignals: signalContext.signals,
+          matchSignalSummary: signalContext.summary,
           baselineTopics
         })
       }

@@ -297,13 +297,15 @@ function buildBasicStatistics(homeName: string, awayName: string, homeScore: num
 
 function normalizeScorers(team: string, raw?: string): MatchEvent[] {
   if (!raw || raw === "null") return [];
-  const matches = [...raw.matchAll(/([^"{},]+?)\s+(\d+)'/g)];
+  const matches = [...raw.matchAll(/([^"{},]+?)\s+(\d+)'(?:\+(\d+)')?(\(OG\))?/g)];
   return matches.map((match) => ({
     minute: Number(match[2]),
+    extraMinute: match[3] ? Number(match[3]) : undefined,
     team,
     player: match[1].trim(),
     type: "Goal",
-    detail: `${match[1].trim()} scored`
+    detail: match[4] ? `${match[1].trim()} own goal` : `${match[1].trim()} scored`,
+    comment: match[4] ? "Own goal" : undefined
   }));
 }
 

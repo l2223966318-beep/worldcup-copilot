@@ -46,7 +46,7 @@ export function worldCupMatchToMatchData(match: WorldCupMatch): MatchData {
     ],
     keyEvents: match.events.length
       ? match.events.map((event) => ({
-          minute: event.minute ? `${event.minute}'` : "-",
+          minute: event.minute ? `${event.minute}${event.extraMinute ? `+${event.extraMinute}` : ""}'` : "-",
           team: event.team,
           type: normalizeEventType(event.type),
           description: [event.player, event.detail, event.comment].filter(Boolean).join(" / ") || event.type

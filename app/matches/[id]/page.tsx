@@ -19,6 +19,7 @@ import { InsightCharts } from "@/components/worldcup/insight-charts";
 import type { MatchData } from "@/data/matches";
 import { generatePlatformContent, type PlatformContent } from "@/lib/ai/content";
 import { reviewRisk } from "@/lib/ai/risk";
+import { extractMatchSignals, type MatchSignal } from "@/lib/ai/signals";
 import { generateTopics, type TopicIdea } from "@/lib/ai/topics";
 import { copyToClipboard, downloadTextFile } from "@/lib/download";
 import { analyzeMatch, getMatchDetail } from "@/lib/project-api";
@@ -72,6 +73,7 @@ export default function MatchAnalysisPage() {
   const match = useMemo(() => (sourceMatch ? worldCupMatchToMatchData(sourceMatch) : fallbackMatch), [fallbackMatch, sourceMatch]);
   const theme = getSportTheme(getMatchSportType(match.id));
   const analysis = useMemo(() => analyzeMatch(match), [match]);
+  const matchSignals = useMemo(() => extractMatchSignals(match), [match]);
   const baselineTopics = useMemo(() => generateTopics(match).slice(0, 3), [match]);
   const [aiEnhancement, setAiEnhancement] = useState<AiWorkflowEnhancement | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -185,6 +187,21 @@ export default function MatchAnalysisPage() {
         <SectionTitle eyebrow="CHART INSIGHTS" title="图表服务内容创作" description="每张图表都配运营解释和可复制金句，用来快速变成脚本、标题或长文段落。" />
         <div className="mt-6">
           <InsightCharts match={match} theme={theme} />
+        </div>
+      </section>
+
+      <section className="rounded-[32px] border bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.06)]" style={{ borderColor: theme.border }}>
+        <SectionTitle eyebrow="FIELD SIGNALS" title="场上热点信号" description="选题不只来自比分和技术统计，更优先来自能被观众记住、讨论和转发的场上瞬间。" />
+        <div className="mt-6 grid gap-4 lg:grid-cols-3">
+          {matchSignals.slice(0, 6).map((signal) => (
+            <MatchSignalCard
+              key={signal.id}
+              signal={signal}
+              theme={theme}
+              copied={copied === `signal-${signal.id}`}
+              onCopy={() => handleCopy(`signal-${signal.id}`, signal.topicSeed)}
+            />
+          ))}
         </div>
       </section>
 
@@ -477,6 +494,55 @@ function DataAngleCard({ label, value, compare, explain, angle, theme }: { label
         内容转化：{angle}
       </div>
     </div>
+  );
+}
+
+function MatchSignalCard({
+  signal,
+  theme,
+  copied,
+  onCopy
+}: {
+  signal: MatchSignal;
+  theme: SportTheme;
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  const riskTone =
+    signal.riskLevel === "高"
+      ? "bg-rose-100 text-rose-700"
+      : signal.riskLevel === "中"
+        ? "bg-amber-100 text-amber-700"
+        : "bg-emerald-100 text-emerald-700";
+
+  return (
+    <article className="rounded-[28px] border bg-white p-5 shadow-sm transition hover:-translate-y-1" style={{ borderColor: signal.priority === "primary" ? theme.primary : theme.border }}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="rounded-full px-3 py-1 text-xs font-black text-white" style={{ backgroundColor: signal.priority === "primary" ? theme.primary : theme.secondary }}>
+          {signal.priority === "primary" ? "优先信号" : signal.priority === "secondary" ? "次级信号" : "观察信号"}
+        </span>
+        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${riskTone}`}>风险：{signal.riskLevel}</span>
+      </div>
+      <h3 className="mt-4 text-xl font-semibold leading-tight text-slate-950">{signal.label}</h3>
+      <p className="mt-2 text-sm font-semibold" style={{ color: theme.primary }}>
+        {signal.minute}｜{signal.team}｜传播价值 {signal.contentValue}
+      </p>
+      <p className="mt-3 min-h-20 text-sm leading-6 text-slate-600">{signal.evidence}</p>
+      <div className="mt-4 rounded-2xl p-4 text-sm leading-6" style={{ backgroundColor: theme.background }}>
+        <div className="font-semibold" style={{ color: theme.secondary }}>可转化选题</div>
+        <p className="mt-1 text-slate-700">{signal.topicSeed}</p>
+      </div>
+      <div className="mt-4 text-sm leading-6 text-slate-600">
+        <div>推荐平台：{signal.recommendedPlatforms.join(" / ")}</div>
+        <div>内容形式：{signal.contentFormats.join(" / ")}</div>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <ActionButton onClick={onCopy} theme={theme} variant="secondary">
+          <Clipboard className="h-4 w-4" />
+          {copied ? "已复制" : "复制选题"}
+        </ActionButton>
+      </div>
+    </article>
   );
 }
 
