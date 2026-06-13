@@ -21,6 +21,9 @@ import { reviewRisk } from "@/lib/ai/risk";
 import { generateTopics, type TopicIdea } from "@/lib/ai/topics";
 import { copyToClipboard, downloadTextFile } from "@/lib/download";
 import { analyzeMatch, getMatchDetail, getMatchTask } from "@/lib/project-api";
+import { worldCupMatchToMatchData } from "@/lib/sports/adapters";
+import { useWorldCupQuery } from "@/lib/sports/client";
+import type { SourceStatus, WorldCupMatch, WorldCupPayload } from "@/lib/sports/types";
 import { getMatchSportType, getSportTheme, type SportTheme } from "@/lib/sport-theme";
 
 const platformLabels = {
@@ -41,7 +44,14 @@ const platformMeta: Record<PlatformKey, { title: string; positioning: string; ac
 
 export default function MatchAnalysisPage() {
   const params = useParams<{ id: string }>();
-  const match = getMatchDetail(params.id);
+  const fixtureId = params.id;
+  const { payload, loading, error } = useWorldCupQuery<WorldCupMatch>(
+    `/api/worldcup/matches/${fixtureId}`,
+    matchRefreshPolicy
+  );
+  const sourceMatch = payload?.data;
+  const fallbackMatch = getMatchDetail(fixtureId);
+  const match = useMemo(() => (sourceMatch ? worldCupMatchToMatchData(sourceMatch) : fallbackMatch), [fallbackMatch, sourceMatch]);
   const task = getMatchTask(params.id);
   const theme = getSportTheme(getMatchSportType(match.id));
   const analysis = useMemo(() => analyzeMatch(match), [match]);
@@ -70,7 +80,16 @@ export default function MatchAnalysisPage() {
         返回今日赛事机会池
       </Link>
 
-      <MatchHero matchName={match.name} taskPriority={task.priority} theme={theme} />
+      <MatchHero
+        matchName={match.name}
+        taskPriority={task.priority}
+        theme={theme}
+        sourceMatch={sourceMatch}
+        sourceStatus={payload?.sourceStatus ?? "fallback"}
+        lastUpdated={payload?.lastUpdated}
+        loading={loading}
+        error={error}
+      />
 
       <section>
         <SectionTitle eyebrow="OPS CONCLUSION" title="运营结论" description="让运营人员 10 秒内知道这场比赛值不值得做、先做什么、要避开什么坑。" />
@@ -222,14 +241,40 @@ export default function MatchAnalysisPage() {
   );
 }
 
-function MatchHero({ matchName, taskPriority, theme }: { matchName: string; taskPriority: string; theme: SportTheme }) {
+function MatchHero({
+  matchName,
+  taskPriority,
+  theme,
+  sourceMatch,
+  sourceStatus,
+  lastUpdated,
+  loading,
+  error
+}: {
+  matchName: string;
+  taskPriority: string;
+  theme: SportTheme;
+  sourceMatch?: WorldCupMatch;
+  sourceStatus: SourceStatus;
+  lastUpdated?: string;
+  loading?: boolean;
+  error?: string;
+}) {
+  const homeTeam = sourceMatch?.homeTeam.name ?? "阿根廷";
+  const awayTeam = sourceMatch?.awayTeam.name ?? "法国";
+  const score = sourceMatch?.score.display ?? "3 - 3";
+  const round = sourceMatch?.round ?? "决赛";
+  const statusText = sourceMatch?.statusText ?? "已结束";
+  const kickoffTime = sourceMatch?.kickoffTime ?? "2022-12-18";
+  const venue = [sourceMatch?.venue.name, sourceMatch?.venue.city].filter(Boolean).join("｜");
+
   return (
     <section className={`relative overflow-hidden rounded-[40px] border bg-gradient-to-br ${theme.gradient} p-7 shadow-[0_28px_90px_rgba(15,23,42,0.08)] lg:p-10`} style={{ borderColor: theme.border }}>
       <FieldPattern theme={theme} />
       <div className="relative z-10 grid gap-8 lg:grid-cols-[1fr_360px] lg:items-end">
         <div>
           <div className="flex flex-wrap gap-2">
-            {["世界杯决赛", "经典样例", "高热度比赛"].map((tag) => (
+            {[round || "世界杯", sourceMatch?.source.provider === "api-football" ? "真实 API 数据" : "经典样例", "高热度比赛"].map((tag) => (
               <span key={tag} className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold shadow-sm" style={{ color: theme.secondary }}>
                 {tag}
               </span>
@@ -237,13 +282,17 @@ function MatchHero({ matchName, taskPriority, theme }: { matchName: string; task
           </div>
           <p className="mt-8 text-sm font-semibold uppercase tracking-[0.2em]" style={{ color: theme.secondary }}>{matchName}</p>
           <div className="mt-4 flex flex-wrap items-end gap-4">
-            <div className="text-5xl font-black tracking-tight text-slate-950 lg:text-7xl">阿根廷</div>
+            <div className="text-5xl font-black tracking-tight text-slate-950 lg:text-7xl">{homeTeam}</div>
             <div className="rounded-[28px] bg-white px-6 py-4 text-5xl font-black shadow-xl shadow-slate-900/10 lg:text-7xl" style={{ color: theme.primary }}>
-              3 - 3
+              {score}
             </div>
-            <div className="text-5xl font-black tracking-tight text-slate-950 lg:text-7xl">法国</div>
+            <div className="text-5xl font-black tracking-tight text-slate-950 lg:text-7xl">{awayTeam}</div>
           </div>
-          <p className="mt-5 text-base font-medium text-slate-600">决赛｜已结束｜点球大战 4-2｜2022-12-18</p>
+          <p className="mt-5 text-base font-medium text-slate-600">
+            {round}｜{statusText}｜{formatSourceDate(kickoffTime)}
+            {venue ? `｜${venue}` : ""}
+          </p>
+          <SourceStatusLine status={sourceStatus} lastUpdated={lastUpdated} loading={loading} error={error} />
           <div className="mt-8 rounded-3xl border bg-white/82 p-5 shadow-sm backdrop-blur" style={{ borderColor: theme.border }}>
             <div className="text-sm font-semibold" style={{ color: theme.secondary }}>推荐动作</div>
             <p className="mt-2 text-2xl font-semibold leading-tight text-slate-950">优先做 B站人物复盘 + 微博话题承接</p>
@@ -266,6 +315,26 @@ function MatchHero({ matchName, taskPriority, theme }: { matchName: string; task
         </div>
       </div>
     </section>
+  );
+}
+
+function SourceStatusLine({
+  status,
+  lastUpdated,
+  loading,
+  error
+}: {
+  status: SourceStatus;
+  lastUpdated?: string;
+  loading?: boolean;
+  error?: string;
+}) {
+  return (
+    <div className="mt-4 inline-flex flex-wrap items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm">
+      <span>数据来源：{loading ? "加载中" : sourceLabel(status)}</span>
+      {lastUpdated ? <span>最后更新：{formatSourceDate(lastUpdated)}</span> : null}
+      {error ? <span className="text-amber-700">请求提示：{error}</span> : null}
+    </div>
   );
 }
 
@@ -528,4 +597,37 @@ function buildMarkdown(title: string, topic: TopicIdea, content: PlatformContent
     "## 合规说明",
     "当前内容基于示例数据生成，仅作为运营创作辅助，发布前需人工核实事实、数据来源和平台规则。"
   ].join("\n");
+}
+
+function getMatchRefreshMs(match: WorldCupMatch) {
+  if (match.status === "live") return 20_000;
+  if (match.status === "finished") return undefined;
+  if (match.status === "scheduled") return 120_000;
+  return 60_000;
+}
+
+function matchRefreshPolicy(payload: WorldCupPayload<WorldCupMatch>) {
+  return getMatchRefreshMs(payload.data);
+}
+
+function sourceLabel(status: SourceStatus) {
+  const labels: Record<SourceStatus, string> = {
+    live: "真实 API 数据",
+    fallback: "示例数据",
+    cache: "缓存数据",
+    error: "请求失败"
+  };
+  return labels[status];
+}
+
+function formatSourceDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
 }

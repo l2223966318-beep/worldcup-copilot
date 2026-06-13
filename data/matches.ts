@@ -36,7 +36,7 @@ export type HistoricalMeeting = {
 
 export type MatchData = {
   id: string;
-  isExample: true;
+  isExample: boolean;
   name: string;
   stage: string;
   time: string;
