@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Check,
@@ -43,6 +43,14 @@ type OpportunityScores = {
   longTail: number;
 };
 
+type AiWorkflowEnhancement = {
+  sourceStatus: "live" | "fallback" | "error";
+  model?: string;
+  message?: string;
+  conclusions: Array<{ title: string; body: string; featured?: boolean }>;
+  topics: TopicIdea[];
+};
+
 const platformMeta: Record<PlatformKey, { title: string; positioning: string; action: string }> = {
   bilibili: { title: "B站", positioning: "深度视频、人物复盘、战术复盘", action: "生成 B站脚本" },
   weibo: { title: "微博", positioning: "热点讨论、话题扩散、情绪传播", action: "生成微博话题" },
@@ -62,10 +70,13 @@ export default function MatchAnalysisPage() {
   const match = useMemo(() => (sourceMatch ? worldCupMatchToMatchData(sourceMatch) : fallbackMatch), [fallbackMatch, sourceMatch]);
   const theme = getSportTheme(getMatchSportType(match.id));
   const analysis = useMemo(() => analyzeMatch(match), [match]);
-  const topics = useMemo(() => generateTopics(match).slice(0, 3), [match]);
+  const baselineTopics = useMemo(() => generateTopics(match).slice(0, 3), [match]);
+  const [aiEnhancement, setAiEnhancement] = useState<AiWorkflowEnhancement | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const topics = aiEnhancement?.sourceStatus === "live" && aiEnhancement.topics.length ? aiEnhancement.topics : baselineTopics;
   const [selectedTopicId, setSelectedTopicId] = useState(topics[0]?.id);
   const selectedTopic = topics.find((topic) => topic.id === selectedTopicId) ?? topics[0];
-  const workflow = useMemo(() => buildMatchWorkflow(match, topics[0], analysis), [analysis, match, topics]);
+  const workflow = useMemo(() => buildMatchWorkflow(match, topics[0], analysis, aiEnhancement), [aiEnhancement, analysis, match, topics]);
   const [activePlatform, setActivePlatform] = useState<PlatformKey>("bilibili");
   const [copied, setCopied] = useState<string | null>(null);
   const [rewriteApplied, setRewriteApplied] = useState<string | null>(null);
@@ -74,6 +85,44 @@ export default function MatchAnalysisPage() {
   const selectedText = useMemo(() => buildSelectedContent(content, ["bilibili", "weibo", "xiaohongshu", "article"]), [content]);
   const risk = useMemo(() => reviewRisk(selectedText), [selectedText]);
   const markdown = useMemo(() => buildMarkdown(match.name, selectedTopic, content, risk.advice), [content, match.name, risk.advice, selectedTopic]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setAiEnhancement(null);
+    setAiLoading(true);
+
+    fetch("/api/ai/match-workflow", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ match, baselineTopics }),
+      signal: controller.signal
+    })
+      .then((response) => response.json())
+      .then((payload: AiWorkflowEnhancement) => {
+        if (!controller.signal.aborted) setAiEnhancement(payload);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          setAiEnhancement({
+            sourceStatus: "error",
+            conclusions: [],
+            topics: [],
+            message: error instanceof Error ? error.message : "AI workflow request failed."
+          });
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setAiLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [baselineTopics, match]);
+
+  useEffect(() => {
+    if (!topics.some((topic) => topic.id === selectedTopicId)) {
+      setSelectedTopicId(topics[0]?.id);
+    }
+  }, [selectedTopicId, topics]);
 
   async function handleCopy(key: string, value: string) {
     await copyToClipboard(value);
@@ -101,6 +150,8 @@ export default function MatchAnalysisPage() {
         loading={loading}
         error={error}
       />
+
+      <AiBrainStatus loading={aiLoading} enhancement={aiEnhancement} theme={theme} />
 
       <section>
         <SectionTitle eyebrow="OPS CONCLUSION" title="运营结论" description="让运营人员 10 秒内知道这场比赛值不值得做、先做什么、要避开什么坑。" />
@@ -318,6 +369,39 @@ function SourceStatusLine({
   );
 }
 
+function AiBrainStatus({
+  loading,
+  enhancement,
+  theme
+}: {
+  loading: boolean;
+  enhancement: AiWorkflowEnhancement | null;
+  theme: SportTheme;
+}) {
+  const isLive = enhancement?.sourceStatus === "live";
+  const label = loading ? "DeepSeek 增强中" : isLive ? `DeepSeek 已启用${enhancement?.model ? `｜${enhancement.model}` : ""}` : "本地规则引擎兜底";
+  const description = loading
+    ? "正在把真实比赛数据转成运营结论、选题参考和平台分发建议。"
+    : isLive
+      ? "当前页面的运营结论和选题已由 DS API 增强，硬数据仍来自 API-Football。"
+      : enhancement?.message ?? "未配置 DeepSeek key 或接口暂不可用，页面继续使用本地规则引擎。";
+
+  return (
+    <section className="rounded-[24px] border bg-white px-5 py-4 shadow-[0_14px_40px_rgba(15,23,42,0.05)]" style={{ borderColor: theme.border }}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-black uppercase tracking-[0.16em]" style={{ color: theme.primary }}>AI BRAIN</div>
+          <div className="mt-1 text-lg font-semibold text-slate-950">{label}</div>
+          <p className="mt-1 text-sm leading-6 text-slate-500">{description}</p>
+        </div>
+        <span className="rounded-full px-3 py-1.5 text-xs font-semibold text-white" style={{ backgroundColor: isLive ? theme.primary : "#64748b" }}>
+          {isLive ? "AI 增强" : "规则兜底"}
+        </span>
+      </div>
+    </section>
+  );
+}
+
 function FieldPattern({ theme }: { theme: SportTheme }) {
   return (
     <div className="pointer-events-none absolute inset-0 opacity-70">
@@ -504,7 +588,12 @@ function ActionButton({ children, onClick, theme, variant = "primary" }: { child
   );
 }
 
-function buildMatchWorkflow(match: MatchData, primaryTopic: TopicIdea, analysis: ReturnType<typeof analyzeMatch>) {
+function buildMatchWorkflow(
+  match: MatchData,
+  primaryTopic: TopicIdea,
+  analysis: ReturnType<typeof analyzeMatch>,
+  aiEnhancement: AiWorkflowEnhancement | null
+) {
   const scores = buildOpportunityScores(match, primaryTopic);
   const possessionLeader = leaderBy(match, "possession");
   const shotLeader = leaderBy(match, "shotsOnTarget");
@@ -519,7 +608,7 @@ function buildMatchWorkflow(match: MatchData, primaryTopic: TopicIdea, analysis:
   return {
     priority,
     scores,
-    conclusions: [
+    conclusions: aiEnhancement?.sourceStatus === "live" && aiEnhancement.conclusions.length ? aiEnhancement.conclusions : [
       {
         title: "为什么值得做",
         body: `${scoreText}，并且已经有${possessionGap}%控球差、${onTargetTotal}次射正等可解释数据。内容不应只报赛果，而要拆成“${primaryTopic.title}”这样的运营主线。`
