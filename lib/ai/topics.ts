@@ -38,6 +38,11 @@ export type TopicIdea = {
 
 export function generateTopics(match: MatchData): TopicIdea[] {
   const topPlayer = [...match.keyPlayers].sort((a, b) => b.rating - a.rating)[0];
+  const isTeamSubject = topPlayer.role === "球队";
+  const leadSubject = isTeamSubject ? `${topPlayer.name}这条比赛线` : topPlayer.name;
+  const leadEvidence = isTeamSubject
+    ? `${topPlayer.name}的比分、射门、射正和控球表现`
+    : `${topPlayer.name}的进球、关键传球、对抗和评分`;
   const possessionGap = Math.abs(match.stats.teamA.possession - match.stats.teamB.possession);
   const xgGap = Math.abs(match.stats.teamA.xg - match.stats.teamB.xg).toFixed(1);
 
@@ -62,8 +67,8 @@ export function generateTopics(match: MatchData): TopicIdea[] {
         }),
         createTopic(match, {
           id: "player-story",
-          title: `${topPlayer.name}如何成为比赛叙事中心`,
-          coreAngle: `用 ${topPlayer.name} 的进球、关键传球、对抗和评分串联比赛情绪。`,
+          title: `${leadSubject}如何成为内容叙事中心`,
+          coreAngle: `用 ${leadEvidence} 串联比赛情绪和平台表达。`,
           category: "球员叙事",
           recommendation: "次推",
           scores: [90, 88, 84, 86, 82, 88, 91],
@@ -73,8 +78,8 @@ export function generateTopics(match: MatchData): TopicIdea[] {
           riskLevel: "低",
           scoreReason: "人物抓手明确，短视频和图文都容易承接。",
           businessExplanation: "适合做第二波传播，用人物线提升非核心球迷的点击意愿。",
-          reason: "人物抓手明确，适合跨平台传播。",
-          sampleTitles: [`${topPlayer.name}这一晚，为什么值得被记住？`, `从一个镜头看懂${topPlayer.name}的比赛气质`]
+          reason: isTeamSubject ? "当前真实数据以球队维度为主，适合先做球队走势叙事，再等待球员细项补强。" : "人物抓手明确，适合跨平台传播。",
+          sampleTitles: [`${leadSubject}，为什么值得单独拆？`, `从一组数据看懂${leadSubject}的内容价值`]
         }),
         createTopic(match, {
           id: "data-anomaly",

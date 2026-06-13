@@ -16,11 +16,12 @@ import {
 } from "lucide-react";
 
 import { InsightCharts } from "@/components/worldcup/insight-charts";
+import type { MatchData } from "@/data/matches";
 import { generatePlatformContent, type PlatformContent } from "@/lib/ai/content";
 import { reviewRisk } from "@/lib/ai/risk";
 import { generateTopics, type TopicIdea } from "@/lib/ai/topics";
 import { copyToClipboard, downloadTextFile } from "@/lib/download";
-import { analyzeMatch, getMatchDetail, getMatchTask } from "@/lib/project-api";
+import { analyzeMatch, getMatchDetail } from "@/lib/project-api";
 import { worldCupMatchToMatchData } from "@/lib/sports/adapters";
 import { useWorldCupQuery } from "@/lib/sports/client";
 import type { SourceStatus, WorldCupMatch, WorldCupPayload } from "@/lib/sports/types";
@@ -34,6 +35,13 @@ const platformLabels = {
 } as const;
 
 type PlatformKey = keyof typeof platformLabels;
+
+type OpportunityScores = {
+  heat: number;
+  emotion: number;
+  narrative: number;
+  longTail: number;
+};
 
 const platformMeta: Record<PlatformKey, { title: string; positioning: string; action: string }> = {
   bilibili: { title: "B站", positioning: "深度视频、人物复盘、战术复盘", action: "生成 B站脚本" },
@@ -52,12 +60,12 @@ export default function MatchAnalysisPage() {
   const sourceMatch = payload?.data;
   const fallbackMatch = getMatchDetail(fixtureId);
   const match = useMemo(() => (sourceMatch ? worldCupMatchToMatchData(sourceMatch) : fallbackMatch), [fallbackMatch, sourceMatch]);
-  const task = getMatchTask(params.id);
   const theme = getSportTheme(getMatchSportType(match.id));
   const analysis = useMemo(() => analyzeMatch(match), [match]);
-  const topics = useMemo(() => normalizeTopics(generateTopics(match).slice(0, 3)), [match]);
+  const topics = useMemo(() => generateTopics(match).slice(0, 3), [match]);
   const [selectedTopicId, setSelectedTopicId] = useState(topics[0]?.id);
   const selectedTopic = topics.find((topic) => topic.id === selectedTopicId) ?? topics[0];
+  const workflow = useMemo(() => buildMatchWorkflow(match, topics[0], analysis), [analysis, match, topics]);
   const [activePlatform, setActivePlatform] = useState<PlatformKey>("bilibili");
   const [copied, setCopied] = useState<string | null>(null);
   const [rewriteApplied, setRewriteApplied] = useState<string | null>(null);
@@ -82,7 +90,10 @@ export default function MatchAnalysisPage() {
 
       <MatchHero
         matchName={match.name}
-        taskPriority={task.priority}
+        match={match}
+        primaryTopic={topics[0]}
+        taskPriority={workflow.priority}
+        scores={workflow.scores}
         theme={theme}
         sourceMatch={sourceMatch}
         sourceStatus={payload?.sourceStatus ?? "fallback"}
@@ -94,52 +105,18 @@ export default function MatchAnalysisPage() {
       <section>
         <SectionTitle eyebrow="OPS CONCLUSION" title="运营结论" description="让运营人员 10 秒内知道这场比赛值不值得做、先做什么、要避开什么坑。" />
         <div className="mt-6 grid gap-4 lg:grid-cols-3">
-          <ConclusionCard
-            title="为什么值得做"
-            body="球星叙事、历史意义和情绪反转同时成立，具备赛后短爆发和长尾复盘双重价值。"
-            theme={theme}
-          />
-          <ConclusionCard
-            title="先做什么"
-            body="主推“梅西职业生涯最后拼图”，先做 B站 8 分钟人物复盘，再用微博承接话题讨论。"
-            theme={theme}
-            featured
-          />
-          <ConclusionCard
-            title="注意什么风险"
-            body="避免制造梅西和姆巴佩对立，表达重点放在时代交接、竞技张力和事实依据。"
-            theme={theme}
-          />
+          {workflow.conclusions.map((item) => (
+            <ConclusionCard key={item.title} title={item.title} body={item.body} theme={theme} featured={item.featured} />
+          ))}
         </div>
       </section>
 
       <section className="rounded-[32px] border bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.06)]" style={{ borderColor: theme.border }}>
         <SectionTitle eyebrow="DATA TO ANGLE" title="核心数据如何转成内容角度" description="数据不是为了摆出来，而是帮助运营判断这场比赛应该怎么讲。" />
         <div className="mt-6 grid gap-4 md:grid-cols-3">
-          <DataAngleCard
-            label="控球率"
-            value={`${match.stats.teamA.possession}% / ${match.stats.teamB.possession}%`}
-            compare={`${match.teamA} vs ${match.teamB}`}
-            explain="阿根廷掌握更多比赛时间，但控球本身不是唯一重点。"
-            angle="可以讨论“控球是否等于控制比赛”。"
-            theme={theme}
-          />
-          <DataAngleCard
-            label="射门 / 射正"
-            value={`${match.stats.teamA.shots}-${match.stats.teamA.shotsOnTarget} / ${match.stats.teamB.shots}-${match.stats.teamB.shotsOnTarget}`}
-            compare="进攻密度"
-            explain="双方进攻效率高，比赛信息密度强。"
-            angle="可以做“为什么这场决赛被认为是神级决赛”。"
-            theme={theme}
-          />
-          <DataAngleCard
-            label="xG"
-            value={`${match.stats.teamA.xg} / ${match.stats.teamB.xg}`}
-            compare="机会质量"
-            explain="机会质量接近，但阿根廷整体输出更稳定。"
-            angle="适合支撑战术复盘和胜负原因分析。"
-            theme={theme}
-          />
+          {workflow.dataAngles.map((item) => (
+            <DataAngleCard key={item.label} {...item} theme={theme} />
+          ))}
         </div>
       </section>
 
@@ -199,13 +176,7 @@ export default function MatchAnalysisPage() {
       <section className="rounded-[32px] border bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.06)]" style={{ borderColor: theme.border }}>
         <SectionTitle eyebrow="RISK REVIEW" title="发布风险审稿" description="风险提示清楚但不过度吓人，重点给运营可执行的稳妥表达。" />
         <div className="mt-6 grid gap-4 lg:grid-cols-5">
-          {[
-            ["舆情风险", "中", "避免制造球星粉丝对立，把重点放在时代交接与竞技张力。"],
-            ["表达风险", risk.level, risk.findings[0]?.rewrite ?? "当前表达整体稳妥，发布前仍建议补充数据来源。"],
-            ["版权风险", "低", "使用比赛画面时注意版权边界，可优先使用自制图表和公开数据。"],
-            ["标题党风险", "中", "标题可以有冲突感，但不要使用黑幕、保送、确认伤退等定性词。"],
-            ["平台适配风险", "低", "微博适合短讨论，B站适合深复盘，小红书适合解释型卡片。"]
-          ].map(([title, level, advice]) => (
+          {workflow.risks.map(({ title, level, advice }) => (
             <RiskCard
               key={title}
               title={title}
@@ -243,7 +214,10 @@ export default function MatchAnalysisPage() {
 
 function MatchHero({
   matchName,
+  match,
+  primaryTopic,
   taskPriority,
+  scores,
   theme,
   sourceMatch,
   sourceStatus,
@@ -252,7 +226,10 @@ function MatchHero({
   error
 }: {
   matchName: string;
+  match: MatchData;
+  primaryTopic: TopicIdea;
   taskPriority: string;
+  scores: OpportunityScores;
   theme: SportTheme;
   sourceMatch?: WorldCupMatch;
   sourceStatus: SourceStatus;
@@ -260,13 +237,16 @@ function MatchHero({
   loading?: boolean;
   error?: string;
 }) {
-  const homeTeam = sourceMatch?.homeTeam.name ?? "阿根廷";
-  const awayTeam = sourceMatch?.awayTeam.name ?? "法国";
-  const score = sourceMatch?.score.display ?? "3 - 3";
-  const round = sourceMatch?.round ?? "决赛";
-  const statusText = sourceMatch?.statusText ?? "已结束";
-  const kickoffTime = sourceMatch?.kickoffTime ?? "2022-12-18";
+  const homeTeam = sourceMatch?.homeTeam.name ?? match.teamA;
+  const awayTeam = sourceMatch?.awayTeam.name ?? match.teamB;
+  const score = sourceMatch?.score.display ?? match.score;
+  const round = sourceMatch?.round ?? match.stage;
+  const statusText = sourceMatch?.statusText ?? (match.isExample ? "经典样例" : "真实数据");
+  const kickoffTime = sourceMatch?.kickoffTime ?? match.time;
   const venue = [sourceMatch?.venue.name, sourceMatch?.venue.city].filter(Boolean).join("｜");
+  const dataTag = sourceMatch?.source.provider === "api-football" ? "真实 API 数据" : match.isExample ? "经典样例" : "运营数据";
+  const actionTitle = `优先做${primaryTopic.recommendedFormat}`;
+  const actionBody = `先用“${primaryTopic.title}”建立内容主线，再用控球、射门、射正和 xG 做证据层，最后按 B站深度、微博讨论、小红书解释卡分发。`;
 
   return (
     <section className={`relative overflow-hidden rounded-[40px] border bg-gradient-to-br ${theme.gradient} p-7 shadow-[0_28px_90px_rgba(15,23,42,0.08)] lg:p-10`} style={{ borderColor: theme.border }}>
@@ -274,7 +254,7 @@ function MatchHero({
       <div className="relative z-10 grid gap-8 lg:grid-cols-[1fr_360px] lg:items-end">
         <div>
           <div className="flex flex-wrap gap-2">
-            {[round || "世界杯", sourceMatch?.source.provider === "api-football" ? "真实 API 数据" : "经典样例", "高热度比赛"].map((tag) => (
+            {[round || "世界杯", dataTag, score === "vs" ? "待赛程分析" : "可拆解内容"].map((tag) => (
               <span key={tag} className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold shadow-sm" style={{ color: theme.secondary }}>
                 {tag}
               </span>
@@ -295,8 +275,8 @@ function MatchHero({
           <SourceStatusLine status={sourceStatus} lastUpdated={lastUpdated} loading={loading} error={error} />
           <div className="mt-8 rounded-3xl border bg-white/82 p-5 shadow-sm backdrop-blur" style={{ borderColor: theme.border }}>
             <div className="text-sm font-semibold" style={{ color: theme.secondary }}>推荐动作</div>
-            <p className="mt-2 text-2xl font-semibold leading-tight text-slate-950">优先做 B站人物复盘 + 微博话题承接</p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">先用“梅西职业生涯最后拼图”打穿情绪，再用数据和历史交锋支撑长尾复盘。</p>
+            <p className="mt-2 text-2xl font-semibold leading-tight text-slate-950">{actionTitle}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">{actionBody}</p>
           </div>
         </div>
 
@@ -307,10 +287,10 @@ function MatchHero({
             <span className="mb-3 text-xl font-semibold text-slate-950">级内容机会</span>
           </div>
           <div className="mt-5 space-y-4">
-            <ScoreBar label="热度" value={96} theme={theme} />
-            <ScoreBar label="情绪" value={94} theme={theme} />
-            <ScoreBar label="叙事" value={98} theme={theme} />
-            <ScoreBar label="长尾价值" value={92} theme={theme} />
+            <ScoreBar label="热度" value={scores.heat} theme={theme} />
+            <ScoreBar label="情绪" value={scores.emotion} theme={theme} />
+            <ScoreBar label="叙事" value={scores.narrative} theme={theme} />
+            <ScoreBar label="长尾价值" value={scores.longTail} theme={theme} />
           </div>
         </div>
       </div>
@@ -524,14 +504,103 @@ function ActionButton({ children, onClick, theme, variant = "primary" }: { child
   );
 }
 
-function normalizeTopics(topics: TopicIdea[]) {
-  if (!topics.length) return topics;
-  const [first, ...rest] = topics;
-  return [
-    { ...first, title: "梅西职业生涯最后拼图" },
-    rest[0] ? { ...rest[0], title: "控球并不等于控制比赛" } : rest[0],
-    rest[1] ? { ...rest[1], title: "姆巴佩的帽子戏法为什么仍然输了" } : rest[1]
-  ].filter(Boolean) as TopicIdea[];
+function buildMatchWorkflow(match: MatchData, primaryTopic: TopicIdea, analysis: ReturnType<typeof analyzeMatch>) {
+  const scores = buildOpportunityScores(match, primaryTopic);
+  const possessionLeader = leaderBy(match, "possession");
+  const shotLeader = leaderBy(match, "shotsOnTarget");
+  const xgLeader = leaderBy(match, "xg");
+  const possessionGap = Math.abs(match.stats.teamA.possession - match.stats.teamB.possession);
+  const shotTotal = match.stats.teamA.shots + match.stats.teamB.shots;
+  const onTargetTotal = match.stats.teamA.shotsOnTarget + match.stats.teamB.shotsOnTarget;
+  const hasXg = match.stats.teamA.xg > 0 || match.stats.teamB.xg > 0;
+  const scoreText = match.score === "vs" ? "当前赛程还没有比分" : `比分已经定格为 ${match.score}`;
+  const priority = scores.heat >= 90 && scores.narrative >= 88 ? "S" : scores.heat >= 78 ? "A" : "B";
+
+  return {
+    priority,
+    scores,
+    conclusions: [
+      {
+        title: "为什么值得做",
+        body: `${scoreText}，并且已经有${possessionGap}%控球差、${onTargetTotal}次射正等可解释数据。内容不应只报赛果，而要拆成“${primaryTopic.title}”这样的运营主线。`
+      },
+      {
+        title: "先做什么",
+        body: `先做${primaryTopic.recommendedFormat}。B站负责把${primaryTopic.category}讲深，微博承接赛后讨论，小红书把关键数据做成可收藏解释卡。`,
+        featured: true
+      },
+      {
+        title: "注意什么风险",
+        body: `${analysis.contentValue} 但真实 API 只提供结构化数据，缺少画面、采访和未公开信息时，不要写“确认伤退”“黑幕”“全网都在骂”等定性说法。`
+      }
+    ],
+    dataAngles: [
+      {
+        label: "控球率",
+        value: `${match.stats.teamA.possession}% / ${match.stats.teamB.possession}%`,
+        compare: `${possessionLeader.name}控球更高`,
+        explain: possessionGap <= 3
+          ? "双方控球接近，运营表达应重点转向射正、xG 和关键事件，不要硬写谁完全控制比赛。"
+          : `${possessionLeader.name}控球多出 ${possessionGap}%，但控球是否形成威胁，还要继续看射正和 xG。`,
+        angle: "适合做“控球是否等于控制比赛”的战术复盘，也适合给非核心球迷做解释卡。"
+      },
+      {
+        label: "射门 / 射正",
+        value: `${match.stats.teamA.shots}-${match.stats.teamA.shotsOnTarget} / ${match.stats.teamB.shots}-${match.stats.teamB.shotsOnTarget}`,
+        compare: `${shotLeader.name}射正更突出`,
+        explain: shotTotal > 0
+          ? `双方合计 ${shotTotal} 次射门、${onTargetTotal} 次射正，能支撑“机会质量”和“进攻效率”的内容判断。`
+          : "当前接口没有返回射门细项，页面先保留结构，发布时应补充技术统计来源。",
+        angle: "适合转成 B站机会质量复盘、微博赛后讨论题和短视频数据钩子。"
+      },
+      {
+        label: "xG",
+        value: `${match.stats.teamA.xg} / ${match.stats.teamB.xg}`,
+        compare: hasXg ? `${xgLeader.name}机会质量更高` : "xG 暂缺或为 0",
+        explain: hasXg
+          ? `${xgLeader.name}的 xG 更高，可以解释比分之外的机会质量差异。`
+          : "如果 API 没有返回 xG，不要强行写预期进球结论，应改用射门、射正和事件时间线补证据。",
+        angle: hasXg ? "适合支撑战术复盘和胜负原因分析。" : "适合做“数据缺失时如何稳妥表达”的风险审稿样例。"
+      }
+    ],
+    risks: [
+      { title: "舆情风险", level: "中", advice: `围绕 ${match.teamA} vs ${match.teamB} 做讨论时，避免制造球迷对立，把重点放在数据、赛程和公开事实。` },
+      { title: "表达风险", level: "低", advice: "当前内容可以发布为运营建议，但涉及判罚、伤病、内部矛盾时必须写“需核实”或“建议补充来源”。" },
+      { title: "版权风险", level: "低", advice: "优先使用自制比分卡、图表和 API 数据说明；如使用比赛画面，需要确认平台版权边界。" },
+      { title: "标题党风险", level: "中", advice: "标题可以有冲突感，但不要使用黑幕、保送、确认伤退、彻底废了等高风险定性词。" },
+      { title: "平台适配风险", level: "低", advice: "微博适合短讨论，B站适合深复盘，小红书适合解释型卡片；不要把同一段文案机械复制到所有平台。" }
+    ] as Array<{ title: string; level: string; advice: string }>
+  };
+}
+
+function buildOpportunityScores(match: MatchData, topic: TopicIdea): OpportunityScores {
+  const totalGoals = scoreTotal(match.score);
+  const shotVolume = match.stats.teamA.shots + match.stats.teamB.shots;
+  const hasStats = shotVolume > 0 || match.stats.teamA.possession !== 50 || match.stats.teamB.possession !== 50;
+
+  return {
+    heat: clampScore(72 + totalGoals * 4 + (match.penaltyScore ? 8 : 0) + (match.isExample ? 8 : 0)),
+    emotion: clampScore(68 + totalGoals * 5 + (match.keyEvents.length >= 3 ? 7 : 0)),
+    narrative: clampScore(Math.round((topic.newsValue + topic.spreadPotential) / 2)),
+    longTail: clampScore(70 + (hasStats ? 12 : 0) + (topic.category === "历史对照" ? 8 : 0))
+  };
+}
+
+function leaderBy(match: MatchData, key: keyof MatchData["stats"]["teamA"]) {
+  const a = match.stats.teamA[key];
+  const b = match.stats.teamB[key];
+  if (a === b) return { name: "双方", value: a };
+  return a > b ? { name: match.teamA, value: a } : { name: match.teamB, value: b };
+}
+
+function scoreTotal(score: string) {
+  const [home, away] = score.split("-").map((value) => Number(value));
+  if (!Number.isFinite(home) || !Number.isFinite(away)) return 0;
+  return home + away;
+}
+
+function clampScore(value: number) {
+  return Math.max(60, Math.min(99, value));
 }
 
 function getPlatformPreview(platform: PlatformKey, content: PlatformContent) {

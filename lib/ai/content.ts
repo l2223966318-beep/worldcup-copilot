@@ -63,6 +63,11 @@ export function generatePlatformContent(match: MatchData, topic: TopicIdea): Pla
   const leadPlayer = match.keyPlayers[0];
   const opponentPlayer = match.keyPlayers[1] ?? leadPlayer;
   const statLine = `${match.teamA}控球率 ${match.stats.teamA.possession}%，射正 ${match.stats.teamA.shotsOnTarget} 次，xG ${match.stats.teamA.xg}；${match.teamB}控球率 ${match.stats.teamB.possession}%，射正 ${match.stats.teamB.shotsOnTarget} 次，xG ${match.stats.teamB.xg}`;
+  const scoreHook = match.score === "vs" ? "赛程信息" : `${match.score} 的比分`;
+  const eventFocus = match.keyEvents.length > 1 ? "关键事件时间线" : "基础数据";
+  const evidenceLine = match.stats.teamA.xg || match.stats.teamB.xg
+    ? "控球、射正和 xG"
+    : "控球、射门和射正";
 
   const raw: PlatformContent = {
     bilibili: {
@@ -79,15 +84,15 @@ export function generatePlatformContent(match: MatchData, topic: TopicIdea): Pla
       outline: [
         "00:00 用比分和关键镜头建立问题",
         "00:45 比赛阶段与双方基础阵型",
-        "02:00 控球率、射门、射正和 xG 的矛盾",
+        `02:00 ${evidenceLine} 之间的矛盾`,
         `04:00 ${leadPlayer.name} 与 ${opponentPlayer.name} 的人物叙事`,
         "06:30 时间线复盘三个转折点",
         "08:00 发布风险提醒与评论区问题"
       ],
-      coverKeywords: [topic.title, match.score, "机会质量", "决赛复盘"],
+      coverKeywords: [topic.title, match.score, "机会质量", match.stage],
       coverCopy: `${topic.title}\n${match.score} 之外的真正胜负手`,
-      danmakuPoints: ["这一脚太关键了", "控球不等于控制", "这里建议回看慢镜头", "点球大战开始紧张了"],
-      commentPrompt: `弹幕互动：你认为这场比赛最关键的是 ${leadPlayer.name} 的发挥、点球大战，还是 120+3 分钟的关键扑救？`,
+      danmakuPoints: [`${match.teamA}这组数据怎么理解`, `${match.teamB}是否踢出了预期`, "控球不等于控制", "这里需要补充来源"],
+      commentPrompt: `弹幕互动：你认为这场比赛最关键的是 ${leadPlayer.name} 的表现、${eventFocus}，还是机会质量？`,
       pinnedComment: "置顶评论：如果只用一句话复盘这场比赛，你会选人物、战术还是数据？欢迎按时间点补充你的判断。",
       creatorType: "战术复盘型、数据解说型、人物叙事型、体育纪录片剪辑型 UP 主。",
       unsuitableCreatorType: "只做情绪剪辑、缺少赛事事实核查、习惯使用攻击性标题的账号。"
@@ -102,8 +107,8 @@ export function generatePlatformContent(match: MatchData, topic: TopicIdea): Pla
       ],
       firstImageCopy: `${match.score} 之后，真正值得讲的是：${topic.title}`,
       cards: [
-        { title: "这场比赛先看什么", body: `${match.name}，最终比分 ${match.score}${match.penaltyScore ? `，点球 ${match.penaltyScore}` : ""}。先抓住比分反转、关键球员和点球压力三条线。` },
-        { title: "主推选题", body: `${topic.title}。核心不是堆情绪，而是把人物、数据和历史意义放在同一条叙事线上。` },
+        { title: "这场比赛先看什么", body: `${match.name}，${scoreHook}${match.penaltyScore ? `，点球 ${match.penaltyScore}` : ""}。先抓住比分、数据差异和关键事件三条线。` },
+        { title: "主推选题", body: `${topic.title}。核心不是堆情绪，而是把比赛事实、数据和平台表达放在同一条叙事线上。` },
         { title: "数据怎么说", body: `${statLine}。建议用“控球不等于控制比赛”或“机会质量高于场面观感”来解释。` },
         { title: "为什么值得收藏", body: "这套结构可以复用到其他比赛：比分、关键事件、人物主线、数据异常、发布风险五个模块。" },
         { title: "发布提醒", body: "涉及裁判、伤病、争议时，用“需核实”“建议补充来源”“从公开信息看”替代绝对判断。" }
@@ -120,29 +125,29 @@ export function generatePlatformContent(match: MatchData, topic: TopicIdea): Pla
       controversySafeVersion: "涉及判罚和争议时，建议写成“这一判罚引发讨论，仍需结合规则条文和权威解读”。避免直接定性。",
       shortComment: `${match.name}踢成 ${match.score}，最值得快速切入的是：${topic.coreAngle}。赛后快评建议先讲事实，再讲观点。`,
       longPost: `【${topic.title}】\n${match.summary}\n\n从数据看，${statLine}。这说明赛后讨论不能只看控球时间，还要看机会质量、关键事件和球员执行。\n\n建议把这场比赛拆成三层：第一层讲赛果和时间线，第二层讲${leadPlayer.name}与${opponentPlayer.name}的人物对照，第三层讲数据与风险边界。`,
-      debateQuestion: `你认为${match.name}最值得复盘的角度是人物叙事、战术变化，还是点球大战心理压力？`,
+      debateQuestion: `你认为${match.name}最值得复盘的角度是人物叙事、战术变化，还是数据差异？`,
       hashtags: ["#世界杯#", `#${match.teamA}vs${match.teamB}#`, "#足球复盘#", "#体育内容运营#"],
       riskTip: "微博讨论容易放大争议，涉及判罚、伤病和攻击性评价时，避免高风险定性词。"
     },
     shortVideo: {
-      threeSecondHook: `${match.score} 不是全部，真正的转折在这三个瞬间。`,
+      threeSecondHook: `${scoreHook}不是全部，真正的内容价值在数据和关键事件里。`,
       fifteenSec: `开头 2 秒：${match.score} 不是全部。中段 8 秒：抛出“${topic.title}”。结尾 5 秒：用一个关键数据或镜头落到评论区问题。`,
       thirtySec: `0-5 秒：比分定格和冲突问题；5-12 秒：讲${leadPlayer.name}或关键事件；12-22 秒：用射正和 xG 解释比赛；22-30 秒：提示风险边界并引导评论。`,
       sixtySec: `用事件时间线串起比赛：开场建立双方状态，中段讲${topic.coreAngle}，后段用数据图表解释走势，最后落到“这条内容适合哪个平台发”。`,
       storyboard: [
-        "比分定格画面，字幕：3-3 不是终点",
+        `比分定格画面，字幕：${scoreHook}不是全部`,
         "关键球员近景，标注进球、助攻、评分",
         "射门 / 射正柱状图，解释机会质量",
         "事件时间线快速闪回",
         "结尾卡：评论区讨论最关键一分钟"
       ],
-      voiceover: `这场${match.name}，如果只看 ${match.score} 会错过真正的内容价值。我们从${topic.coreAngle}切入，能看到人物、数据和历史意义如何叠在一起。`,
+      voiceover: `这场${match.name}，如果只看 ${match.score} 会错过真正的内容价值。我们从${topic.coreAngle}切入，能看到比赛事实、数据证据和平台表达如何叠在一起。`,
       materialList: ["比分图", "球员特写", "射门数据图", "事件时间线", "历史交锋图", "风险提示字幕"],
       visuals: ["比分卡", "球员照片位", "柱状图", "时间线", "风险提示标签", "评论区问题卡"]
     },
     article: {
       title: `${topic.title}：${match.name}内容方案`,
-      intro: `这场比赛兼具赛事结果、人物叙事和数据解读价值。本文建议围绕“${topic.coreAngle}”展开，形成可用于公众号或专栏的完整复盘。`,
+      intro: `这场比赛已经具备赛事结果、数据解读和平台分发价值。本文建议围绕“${topic.coreAngle}”展开，形成可用于公众号或专栏的完整复盘。`,
       fullOutline: [
         "一、比赛信息与核心结论",
         "二、关键事件时间线",
