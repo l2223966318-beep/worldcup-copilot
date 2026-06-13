@@ -4,7 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const notes = [
+  "2026 世界杯赛程、比分、分组、球队和场馆优先使用 WorldCup26 免费 API，备用赛程来自 TheStatsAPI 免费静态数据。",
   "当前版本使用示例数据、用户输入数据和手动导入数据。",
+  "免费公开源通常不包含完整 xG、射门分布、传球线路等深度技术统计，相关分析会在页面中标注数据覆盖限制。",
   "不后台抓取抖音、小红书、B站、微博等平台登录内容。",
   "不保存账号、密码、Cookie 或个人平台会话。",
   "AI 生成内容仅作为创作辅助，不替代人工编辑和事实核查。",

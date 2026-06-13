@@ -295,7 +295,7 @@ function MatchHero({
   const statusText = sourceMatch?.statusText ?? (match.isExample ? "经典样例" : "真实数据");
   const kickoffTime = sourceMatch?.kickoffTime ?? match.time;
   const venue = [sourceMatch?.venue.name, sourceMatch?.venue.city].filter(Boolean).join("｜");
-  const dataTag = sourceMatch?.source.provider === "api-football" ? "真实 API 数据" : match.isExample ? "经典样例" : "运营数据";
+  const dataTag = sourceMatch ? sourceProviderTag(sourceMatch.source.provider) : match.isExample ? "经典样例" : "运营数据";
   const actionTitle = `优先做${primaryTopic.recommendedFormat}`;
   const actionBody = `先用“${primaryTopic.title}”建立内容主线，再用控球、射门、射正和 xG 做证据层，最后按 B站深度、微博讨论、小红书解释卡分发。`;
 
@@ -776,6 +776,16 @@ function sourceLabel(status: SourceStatus) {
     error: "请求失败"
   };
   return labels[status];
+}
+
+function sourceProviderTag(provider: WorldCupMatch["source"]["provider"]) {
+  const labels: Record<WorldCupMatch["source"]["provider"], string> = {
+    "api-football": "真实 API 数据",
+    "worldcup26-free": "WorldCup26 免费 API",
+    "thestatsapi-fixtures": "TheStatsAPI 免费赛程",
+    mock: "经典样例"
+  };
+  return labels[provider];
 }
 
 function formatSourceDate(value: string) {

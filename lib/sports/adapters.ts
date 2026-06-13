@@ -15,7 +15,7 @@ export function worldCupMatchToMatchData(match: WorldCupMatch): MatchData {
     teamB: match.awayTeam.name,
     score: match.score.home !== null && match.score.away !== null ? `${match.score.home}-${match.score.away}` : "vs",
     penaltyScore: match.score.penalty,
-    summary: `${match.homeTeam.name} vs ${match.awayTeam.name}，状态：${match.statusText}。当前数据来自${match.source.provider === "mock" ? "示例数据" : "API-Football"}，适合用于赛后内容角度、平台分发和风险审稿。`,
+    summary: `${match.homeTeam.name} vs ${match.awayTeam.name}，状态：${match.statusText}。当前数据来自${sourceProviderName(match.source.provider)}，适合用于赛后内容角度、平台分发和风险审稿。`,
     stats: {
       teamA: homeStats,
       teamB: awayStats
@@ -97,4 +97,14 @@ function normalizeEventType(type: string): MatchEvent["type"] {
   if (type.includes("Card")) return "黄牌";
   if (type.includes("subst")) return "换人";
   return "终场";
+}
+
+function sourceProviderName(provider: WorldCupMatch["source"]["provider"]) {
+  const names: Record<WorldCupMatch["source"]["provider"], string> = {
+    "api-football": "API-Football",
+    "worldcup26-free": "WorldCup26 免费 API",
+    "thestatsapi-fixtures": "TheStatsAPI 免费赛程",
+    mock: "示例数据"
+  };
+  return names[provider];
 }

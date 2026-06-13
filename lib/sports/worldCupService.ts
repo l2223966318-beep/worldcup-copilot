@@ -14,9 +14,16 @@ import type {
   WorldCupMatch,
   WorldCupPayload
 } from "@/lib/sports/types";
+import {
+  getFreeWorldCup2026Fixtures,
+  getFreeWorldCup2026Live,
+  getFreeWorldCup2026Match,
+  getFreeWorldCup2026Standings,
+  getFreeWorldCup2026Today
+} from "@/lib/sports/worldCup2026FreeClient";
 
 const WORLD_CUP_LEAGUE = 1;
-const DEFAULT_WORLD_CUP_SEASON = 2022;
+const DEFAULT_WORLD_CUP_SEASON = 2026;
 const WORLD_CUP_SEASON = getConfiguredWorldCupSeason();
 const CACHE_TTL_MS = 60_000;
 
@@ -28,6 +35,10 @@ type CacheEntry<T> = {
 const cache = new Map<string, CacheEntry<unknown>>();
 
 export async function getWorldCupFixtures() {
+  if (shouldUseFreeWorldCup2026Source()) {
+    return cached("free-2026-fixtures", CACHE_TTL_MS, getFreeWorldCup2026Fixtures, fallbackList);
+  }
+
   return cached("fixtures", CACHE_TTL_MS, async () => {
     const payload = await apiFootballGet<ApiFootballFixture[]>("/fixtures", {
       league: WORLD_CUP_LEAGUE,
@@ -40,6 +51,10 @@ export async function getWorldCupFixtures() {
 }
 
 export async function getTodayWorldCupFixtures(date = getTodayDate()) {
+  if (shouldUseFreeWorldCup2026Source()) {
+    return cached(`free-2026-fixtures-today-${date}`, 60_000, () => getFreeWorldCup2026Today(date), fallbackList);
+  }
+
   return cached(`fixtures-today-${date}`, 60_000, async () => {
     const payload = await apiFootballGet<ApiFootballFixture[]>("/fixtures", {
       league: WORLD_CUP_LEAGUE,
@@ -53,6 +68,10 @@ export async function getTodayWorldCupFixtures(date = getTodayDate()) {
 }
 
 export async function getLiveWorldCupFixtures() {
+  if (shouldUseFreeWorldCup2026Source()) {
+    return cached("free-2026-fixtures-live", 20_000, getFreeWorldCup2026Live, () => createPayload("fallback", []));
+  }
+
   return cached("fixtures-live", 20_000, async () => {
     const payload = await apiFootballGet<ApiFootballFixture[]>("/fixtures", {
       league: WORLD_CUP_LEAGUE,
@@ -68,6 +87,15 @@ export async function getLiveWorldCupFixtures() {
 export async function getWorldCupMatch(fixtureId: string) {
   if (fixtureId === "argentina-france-2022-final") {
     return createPayload("fallback", getFallbackMatch(fixtureId), "Historical mock sample.");
+  }
+
+  if (shouldUseFreeWorldCup2026Source()) {
+    return cached(
+      `free-2026-match-${fixtureId}`,
+      60_000,
+      () => getFreeWorldCup2026Match(fixtureId),
+      (message) => createPayload("fallback", getFallbackMatch(fixtureId), message)
+    );
   }
 
   return cached(`match-${fixtureId}`, 60_000, async () => {
@@ -90,6 +118,10 @@ export async function getWorldCupMatch(fixtureId: string) {
 }
 
 export async function getWorldCupStandings() {
+  if (shouldUseFreeWorldCup2026Source()) {
+    return cached("free-2026-standings", 120_000, getFreeWorldCup2026Standings, (message) => createPayload("fallback", [], message));
+  }
+
   return cached("standings", 120_000, async () => {
     const payload = await apiFootballGet<unknown[]>("/standings", {
       league: WORLD_CUP_LEAGUE,
@@ -142,4 +174,9 @@ function getTodayDate() {
 function getConfiguredWorldCupSeason() {
   const season = Number(process.env.API_FOOTBALL_SEASON);
   return Number.isInteger(season) && season > 0 ? season : DEFAULT_WORLD_CUP_SEASON;
+}
+
+function shouldUseFreeWorldCup2026Source() {
+  const source = process.env.WORLD_CUP_DATA_SOURCE ?? "free-2026";
+  return source === "free-2026" || (WORLD_CUP_SEASON === 2026 && source !== "api-football");
 }

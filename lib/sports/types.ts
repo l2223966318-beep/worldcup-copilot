@@ -57,7 +57,7 @@ export type WorldCupMatch = {
   events: MatchEvent[];
   statistics: MatchStatistic[];
   source: {
-    provider: "api-football" | "mock";
+    provider: "api-football" | "worldcup26-free" | "thestatsapi-fixtures" | "mock";
     league: number;
     season: number;
   };
