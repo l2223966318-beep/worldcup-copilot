@@ -27,12 +27,13 @@ export function normalizeFixture(
   const score = normalizeScore(fixture);
   const status = normalizeStatus(fixture.fixture?.status?.short);
   const round = fixture.league?.round ?? "World Cup";
+  const season = Number(fixture.league?.season ?? WORLD_CUP_SEASON);
 
   return {
     id: String(fixture.fixture?.id ?? ""),
     sportType: "football",
     competition: fixture.league?.name ?? "FIFA World Cup",
-    season: Number(fixture.league?.season ?? WORLD_CUP_SEASON),
+    season,
     round,
     group: parseGroup(round),
     kickoffTime: fixture.fixture?.date ?? "",
@@ -68,7 +69,7 @@ export function normalizeFixture(
     source: {
       provider: "api-football",
       league: WORLD_CUP_LEAGUE,
-      season: WORLD_CUP_SEASON
+      season
     },
     lastUpdated
   };
