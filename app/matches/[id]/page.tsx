@@ -72,23 +72,26 @@ export default function MatchAnalysisPage() {
 
       <MatchHero matchName={match.name} taskPriority={task.priority} theme={theme} />
 
-      <section className="grid gap-4 lg:grid-cols-3">
-        <ConclusionCard
-          title="为什么值得做"
-          body="球星叙事、历史意义和情绪反转同时成立，具备赛后短爆发和长尾复盘双重价值。"
-          theme={theme}
-        />
-        <ConclusionCard
-          title="先做什么"
-          body="主推“梅西职业生涯最后拼图”，先做 B站 8 分钟人物复盘，再用微博承接话题讨论。"
-          theme={theme}
-          featured
-        />
-        <ConclusionCard
-          title="注意什么风险"
-          body="避免制造梅西和姆巴佩对立，表达重点放在时代交接、竞技张力和事实依据。"
-          theme={theme}
-        />
+      <section>
+        <SectionTitle eyebrow="OPS CONCLUSION" title="运营结论" description="让运营人员 10 秒内知道这场比赛值不值得做、先做什么、要避开什么坑。" />
+        <div className="mt-6 grid gap-4 lg:grid-cols-3">
+          <ConclusionCard
+            title="为什么值得做"
+            body="球星叙事、历史意义和情绪反转同时成立，具备赛后短爆发和长尾复盘双重价值。"
+            theme={theme}
+          />
+          <ConclusionCard
+            title="先做什么"
+            body="主推“梅西职业生涯最后拼图”，先做 B站 8 分钟人物复盘，再用微博承接话题讨论。"
+            theme={theme}
+            featured
+          />
+          <ConclusionCard
+            title="注意什么风险"
+            body="避免制造梅西和姆巴佩对立，表达重点放在时代交接、竞技张力和事实依据。"
+            theme={theme}
+          />
+        </div>
       </section>
 
       <section className="rounded-[32px] border bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.06)]" style={{ borderColor: theme.border }}>
