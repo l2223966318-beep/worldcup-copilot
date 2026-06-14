@@ -23,15 +23,21 @@ import { extractMatchSignals, type MatchSignal } from "@/lib/ai/signals";
 import { generateTopics, type TopicIdea } from "@/lib/ai/topics";
 import { copyToClipboard, downloadTextFile } from "@/lib/download";
 import { analyzeMatch, getMatchDetail } from "@/lib/project-api";
+import { createRuleBasedAnalysis } from "@/lib/services/analysisService";
+import { createPlatformDraft } from "@/lib/services/contentService";
+import { createContentPackage, createPackageMarkdown, createPackageText } from "@/lib/services/exportService";
+import { writeReviewDraft, writeWorkflowState } from "@/lib/services/workflowStore";
 import { worldCupMatchToMatchData } from "@/lib/sports/adapters";
 import { useWorldCupQuery } from "@/lib/sports/client";
 import type { SourceStatus, WorldCupMatch, WorldCupPayload } from "@/lib/sports/types";
 import { getMatchSportType, getSportTheme, type SportTheme } from "@/lib/sport-theme";
+import type { AnalysisResult, MatchContext, PlatformDraft, WorkflowTopic } from "@/types/workflow";
 
 const platformLabels = {
   bilibili: "B站",
   weibo: "微博",
   xiaohongshu: "小红书",
+  douyin: "抖音",
   article: "公众号"
 } as const;
 
@@ -58,6 +64,7 @@ const platformMeta: Record<PlatformKey, { title: string; positioning: string; ac
   bilibili: { title: "B站", positioning: "深度视频、人物复盘、战术复盘", action: "生成 B站脚本" },
   weibo: { title: "微博", positioning: "热点讨论、话题扩散、情绪传播", action: "生成微博话题" },
   xiaohongshu: { title: "小红书", positioning: "图文收藏、新手看球解释、轻表达", action: "生成小红书图文" },
+  douyin: { title: "抖音", positioning: "短视频口播、前三秒钩子、节奏分镜", action: "生成抖音口播" },
   article: { title: "公众号", positioning: "深度评论、历史纵深、长文沉淀", action: "生成公众号长文" }
 };
 
@@ -84,6 +91,9 @@ export default function MatchAnalysisPage() {
   const [activePlatform, setActivePlatform] = useState<PlatformKey>("bilibili");
   const [copied, setCopied] = useState<string | null>(null);
   const [rewriteApplied, setRewriteApplied] = useState<string | null>(null);
+  const [manualAnalysis, setManualAnalysis] = useState<AnalysisResult | null>(null);
+  const [manualDraft, setManualDraft] = useState<PlatformDraft | null>(null);
+  const [workflowNotice, setWorkflowNotice] = useState("");
 
   const localContent = useMemo(() => generatePlatformContent(match, selectedTopic), [match, selectedTopic]);
   const content = useMemo(() => {
@@ -94,9 +104,18 @@ export default function MatchAnalysisPage() {
 
     return localContent;
   }, [aiEnhancement, localContent, selectedTopic.id]);
-  const selectedText = useMemo(() => buildSelectedContent(content, ["bilibili", "weibo", "xiaohongshu", "article"]), [content]);
+  const selectedText = useMemo(() => buildSelectedContent(content, ["bilibili", "weibo", "xiaohongshu", "douyin", "article"]), [content]);
   const risk = useMemo(() => reviewRisk(selectedText), [selectedText]);
   const markdown = useMemo(() => buildMarkdown(match.name, selectedTopic, content, risk.advice), [content, match.name, risk.advice, selectedTopic]);
+  const matchContext = useMemo(
+    () => buildMatchContext(match, matchSignals, payload?.sourceStatus ?? "fallback"),
+    [match, matchSignals, payload?.sourceStatus]
+  );
+  const workflowTopic = useMemo(() => topicToWorkflowTopic(selectedTopic), [selectedTopic]);
+  const activeWorkflowDraft = useMemo(
+    () => manualDraft ?? createPlatformDraft(toWorkflowPlatform(activePlatform), matchContext, workflowTopic, manualAnalysis ?? createRuleBasedAnalysis(matchContext)),
+    [activePlatform, manualAnalysis, manualDraft, matchContext, workflowTopic]
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -136,10 +155,87 @@ export default function MatchAnalysisPage() {
     }
   }, [selectedTopicId, topics]);
 
+  useEffect(() => {
+    writeWorkflowState({
+      currentMatch: matchContext,
+      selectedTopic: workflowTopic,
+      selectedPlatform: toWorkflowPlatform(activePlatform),
+      dataSourceStatus: matchContext.matchInfo.sourceStatus
+    });
+  }, [activePlatform, matchContext, workflowTopic]);
+
   async function handleCopy(key: string, value: string) {
     await copyToClipboard(value);
     setCopied(key);
     window.setTimeout(() => setCopied(null), 1600);
+  }
+
+  function showWorkflowNotice(message: string) {
+    setWorkflowNotice(message);
+    window.setTimeout(() => setWorkflowNotice(""), 1800);
+  }
+
+  function handleGenerateAnalysis() {
+    const result = createRuleBasedAnalysis(matchContext);
+    setManualAnalysis(result);
+    writeWorkflowState({
+      currentMatch: matchContext,
+      analysisResult: result,
+      dataSourceStatus: matchContext.matchInfo.sourceStatus
+    });
+    showWorkflowNotice("赛事分析已生成并写入工作流。");
+  }
+
+  function handleGenerateTopics() {
+    const topicList = topics.map(topicToWorkflowTopic);
+    writeWorkflowState({
+      currentMatch: matchContext,
+      topicList,
+      selectedTopic: workflowTopic
+    });
+    showWorkflowNotice("选题已生成，可继续生成平台文案。");
+  }
+
+  function handleGeneratePlatformDraft() {
+    const analysisSnapshot = manualAnalysis ?? createRuleBasedAnalysis(matchContext);
+    const draft = createPlatformDraft(toWorkflowPlatform(activePlatform), matchContext, workflowTopic, analysisSnapshot);
+    setManualAnalysis(analysisSnapshot);
+    setManualDraft(draft);
+    writeWorkflowState({
+      currentMatch: matchContext,
+      analysisResult: analysisSnapshot,
+      selectedTopic: workflowTopic,
+      selectedPlatform: draft.platform,
+      generatedContent: draft
+    });
+    showWorkflowNotice(`${platformMeta[activePlatform].title} 文案已生成。`);
+  }
+
+  function handleSendToReview() {
+    writeReviewDraft(activeWorkflowDraft.body);
+    writeWorkflowState({
+      currentMatch: matchContext,
+      selectedTopic: workflowTopic,
+      selectedPlatform: activeWorkflowDraft.platform,
+      generatedContent: activeWorkflowDraft
+    });
+    showWorkflowNotice("已送入风险审稿模块。");
+  }
+
+  function buildCurrentPackage() {
+    const analysisSnapshot = manualAnalysis ?? createRuleBasedAnalysis(matchContext);
+    return createContentPackage({
+      matchContext,
+      analysis: analysisSnapshot,
+      selectedTopic: workflowTopic,
+      platformDraft: activeWorkflowDraft,
+      reviewResult: {
+        level: risk.level,
+        score: risk.score,
+        findings: risk.findings.map((finding) => ({ type: finding.type, sentence: finding.sentence, rewrite: finding.rewrite })),
+        advice: risk.advice
+      }
+    });
   }
 
   return (
@@ -164,6 +260,64 @@ export default function MatchAnalysisPage() {
       />
 
       <AiBrainStatus loading={aiLoading} enhancement={aiEnhancement} theme={theme} />
+
+      <section className="rounded-[32px] border bg-white p-5 shadow-[0_20px_70px_rgba(15,23,42,0.06)]" style={{ borderColor: theme.border }}>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-semibold text-slate-950">完整功能链路</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+              按顺序执行：赛事分析 → 选题 → 平台文案 → 风险审稿 → 内容包导出。没有 API Key 时使用本地规则兜底。
+            </p>
+            {workflowNotice ? <p className="mt-2 text-sm font-semibold text-emerald-700">{workflowNotice}</p> : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <ActionButton onClick={handleGenerateAnalysis} theme={theme} variant="secondary">
+              <Sparkles className="h-4 w-4" />
+              生成赛事分析
+            </ActionButton>
+            <ActionButton onClick={handleGenerateTopics} theme={theme} variant="secondary">
+              生成选题
+            </ActionButton>
+            <ActionButton onClick={handleGeneratePlatformDraft} theme={theme}>
+              生成{platformMeta[activePlatform].title}文案
+            </ActionButton>
+            <Link href="/risk-review" onClick={handleSendToReview} className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5">
+              送入审稿
+            </Link>
+            <ActionButton
+              onClick={() => downloadTextFile(`${match.id}-content-package.json`, JSON.stringify(buildCurrentPackage(), null, 2), "application/json;charset=utf-8")}
+              theme={theme}
+              variant="secondary"
+            >
+              <Download className="h-4 w-4" />
+              导出 JSON
+            </ActionButton>
+            <ActionButton
+              onClick={() => downloadTextFile(`${match.id}-content-package.txt`, createPackageText(buildCurrentPackage()), "text/plain;charset=utf-8")}
+              theme={theme}
+              variant="secondary"
+            >
+              导出 TXT
+            </ActionButton>
+          </div>
+        </div>
+        {manualAnalysis ? (
+          <div className="mt-5 grid gap-3 lg:grid-cols-3">
+            <div className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+              <div className="font-semibold text-slate-950">赛事总结</div>
+              <p className="mt-2">{manualAnalysis.summary}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+              <div className="font-semibold text-slate-950">胜负原因</div>
+              <p className="mt-2">{manualAnalysis.winLossReason}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+              <div className="font-semibold text-slate-950">传播看点</div>
+              <p className="mt-2">{manualAnalysis.communicationAngles.join(" / ")}</p>
+            </div>
+          </div>
+        ) : null}
+      </section>
 
       <section>
         <SectionTitle eyebrow="OPS CONCLUSION" title="运营结论" description="让运营人员 10 秒内知道这场比赛值不值得做、先做什么、要避开什么坑。" />
@@ -244,10 +398,7 @@ export default function MatchAnalysisPage() {
           copied={copied}
           onCopy={handleCopy}
           onExport={() => downloadTextFile(`${match.id}-${activePlatform}.md`, buildPlatformMarkdown(activePlatform, content), "text/markdown;charset=utf-8")}
-          onRegenerate={() => {
-            setCopied("regen");
-            window.setTimeout(() => setCopied(null), 1200);
-          }}
+          onRegenerate={handleGeneratePlatformDraft}
         />
       </section>
 
@@ -773,6 +924,57 @@ function clampScore(value: number) {
   return Math.max(60, Math.min(99, value));
 }
 
+function buildMatchContext(match: MatchData, signals: MatchSignal[], sourceStatus: SourceStatus): MatchContext {
+  return {
+    id: match.id,
+    matchInfo: {
+      id: match.id,
+      name: match.name,
+      teamA: match.teamA,
+      teamB: match.teamB,
+      score: match.score,
+      stage: match.stage,
+      time: match.time,
+      sourceStatus
+    },
+    keyEvents: match.keyEvents.map((event) => ({
+      minute: event.minute,
+      team: event.team,
+      type: event.type,
+      description: event.description
+    })),
+    keyPlayers: match.keyPlayers.map((player) => ({
+      name: player.name,
+      team: player.team,
+      role: player.role,
+      rating: player.rating
+    })),
+    stats: match.stats,
+    hotSignals: signals.map((signal) => ({
+      label: signal.label,
+      topicSeed: signal.topicSeed,
+      contentValue: signal.contentValue
+    })),
+    summary: match.summary
+  };
+}
+
+function topicToWorkflowTopic(topic: TopicIdea): WorkflowTopic {
+  return {
+    id: topic.id,
+    title: topic.title,
+    category: topic.category,
+    coreAngle: topic.coreAngle,
+    reason: topic.reason,
+    riskLevel: topic.riskLevel,
+    recommendedFormat: topic.recommendedFormat
+  };
+}
+
+function toWorkflowPlatform(platform: PlatformKey) {
+  return platform === "douyin" ? "douyin" : platform;
+}
+
 function getPlatformPreview(platform: PlatformKey, content: PlatformContent) {
   if (platform === "bilibili") {
     const items = [
@@ -801,6 +1003,16 @@ function getPlatformPreview(platform: PlatformKey, content: PlatformContent) {
       { label: "口语化正文", value: content.xiaohongshu.cards.map((card) => `${card.title}：${card.body}`).join(" / ") }
     ];
     return { title: "图文收藏解释包", items, fullText: items.map((item) => `${item.label}：${item.value}`).join("\n") };
+  }
+  if (platform === "douyin") {
+    const items = [
+      { label: "前三秒钩子", value: content.shortVideo.threeSecondHook },
+      { label: "15秒口播", value: content.shortVideo.fifteenSec },
+      { label: "30秒口播", value: content.shortVideo.thirtySec },
+      { label: "60秒口播", value: content.shortVideo.sixtySec },
+      { label: "画面素材清单", value: content.shortVideo.materialList.join(" / ") }
+    ];
+    return { title: "抖音短视频口播包", items, fullText: items.map((item) => `${item.label}：${item.value}`).join("\n") };
   }
   const items = [
     { label: "深度标题", value: content.article.title },

@@ -13,9 +13,19 @@ export default function DashboardPage() {
   const theme = getSportTheme("football");
   const { payload, loading, error } = useWorldCupQuery<WorldCupMatch[]>("/api/worldcup/fixtures/today", 60_000);
   const matches = payload?.data ?? [];
-  const priorityMatches = matches.filter((item) => getPriority(item) === "S" || getPriority(item) === "A");
-  const watchMatches = matches.filter((item) => getPriority(item) === "B");
-  const firstMatchHref = matches[0] ? `/matches/${matches[0].id}` : "/matches/argentina-france-2022-final";
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("");
+  const [competitionFilter, setCompetitionFilter] = useState("all");
+  const filteredMatches = matches.filter((item) => {
+    const statusOk = statusFilter === "all" || item.status === statusFilter;
+    const dateOk = !dateFilter || item.kickoffTime.slice(0, 10) === dateFilter;
+    const competitionOk = competitionFilter === "all" || item.competition === competitionFilter;
+    return statusOk && dateOk && competitionOk;
+  });
+  const competitions = Array.from(new Set(matches.map((item) => item.competition))).filter(Boolean);
+  const priorityMatches = filteredMatches.filter((item) => getPriority(item) === "S" || getPriority(item) === "A");
+  const watchMatches = filteredMatches.filter((item) => getPriority(item) === "B");
+  const firstMatchHref = filteredMatches[0] ? `/matches/${filteredMatches[0].id}` : "/matches/argentina-france-2022-final";
   const [hotQuery, setHotQuery] = useState("美国队 乌龙球 世界杯");
   const [hotPayload, setHotPayload] = useState<HotSearchPayload>();
   const [hotLoading, setHotLoading] = useState(false);
@@ -198,14 +208,36 @@ export default function DashboardPage() {
           <SectionTitle eyebrow="TODAY OPPORTUNITIES" title="今日赛事内容机会池" description="数据来自内部服务端接口，API-Football 不会暴露给浏览器。" />
           <SourceBadge status={payload?.sourceStatus ?? "fallback"} lastUpdated={payload?.lastUpdated} loading={loading} error={error} />
         </div>
+        <div className="mt-5 grid gap-3 rounded-[24px] border border-slate-200 bg-white p-4 md:grid-cols-3">
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-500">赛事</span>
+            <select value={competitionFilter} onChange={(event) => setCompetitionFilter(event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none">
+              <option value="all">全部赛事</option>
+              {competitions.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-500">日期</span>
+            <input type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none" />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-500">状态</span>
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none">
+              <option value="all">全部状态</option>
+              <option value="scheduled">未开始</option>
+              <option value="live">进行中</option>
+              <option value="finished">已结束</option>
+            </select>
+          </label>
+        </div>
         <div className="mt-6 grid gap-5">
-          {matches.length ? (
-            matches.map((item) => (
+          {filteredMatches.length ? (
+            filteredMatches.map((item) => (
               <OpportunityMatchCard key={item.id} match={item} theme={theme} sourceStatus={payload?.sourceStatus ?? "fallback"} />
             ))
           ) : (
             <div className="rounded-[30px] border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">
-              今日暂无比赛数据。系统会继续使用 fallback 保障页面可演示。
+              当前筛选条件下没有比赛。可清空筛选，或继续使用经典样例完整演示。
             </div>
           )}
         </div>

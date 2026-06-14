@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { knowledgeEntries } from "@/data/knowledge";
+import { appendKnowledgeContext } from "@/lib/services/workflowStore";
 
 const sampleQuestions = [
   "梅西和姆巴佩在世界杯决赛中的表现有什么历史意义？",
@@ -17,6 +18,7 @@ const sampleQuestions = [
 
 export default function KnowledgePage() {
   const [question, setQuestion] = useState(sampleQuestions[0]);
+  const [inserted, setInserted] = useState(false);
   const result = useMemo(() => {
     const exact = knowledgeEntries.find((item) => item.question === question);
     if (exact) return exact;
@@ -25,6 +27,12 @@ export default function KnowledgePage() {
     if (question.includes("历史") || question.includes("交锋")) return knowledgeEntries.find((item) => item.id === "argentina-france-history") ?? knowledgeEntries[0];
     return knowledgeEntries[0];
   }, [question]);
+
+  function insertIntoContext() {
+    appendKnowledgeContext(`${result.question}\n${result.answer}`);
+    setInserted(true);
+    window.setTimeout(() => setInserted(false), 1400);
+  }
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -63,6 +71,7 @@ export default function KnowledgePage() {
           <List title="可用于内容创作的角度" items={result.angles} />
           <Section title="建议用途" body={result.usage} />
           <Section title="来源说明" body={result.sourceNote} />
+          <Button onClick={insertIntoContext}>{inserted ? "已插入上下文" : "插入到内容生成上下文"}</Button>
         </CardContent>
       </Card>
 

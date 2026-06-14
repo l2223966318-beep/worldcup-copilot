@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ShieldCheck } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ArrowRight, Copy, ShieldCheck } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { reviewRisk } from "@/lib/ai/risk";
+import { copyToClipboard } from "@/lib/download";
+import { readReviewDraft, writeWorkflowState } from "@/lib/services/workflowStore";
 
 const sampleDraft =
   "这场比赛就是裁判黑哨，某队靠黑幕夺冠。某球员彻底废了，已经确认伤退。全网都在骂这个判罚，数据显示他们一定是被保送。";
@@ -22,7 +24,33 @@ const samples = [
 
 export default function RiskReviewPage() {
   const [text, setText] = useState(sampleDraft);
+  const [copied, setCopied] = useState(false);
   const result = useMemo(() => reviewRisk(text), [text]);
+
+  useEffect(() => {
+    const draft = readReviewDraft();
+    if (draft) setText(draft);
+  }, []);
+
+  useEffect(() => {
+    writeWorkflowState({
+      reviewResult: {
+        level: result.level,
+        score: result.score,
+        advice: result.advice,
+        findings: result.findings.map((finding) => ({ type: finding.type, sentence: finding.sentence, rewrite: finding.rewrite }))
+      }
+    });
+  }, [result]);
+
+  async function copySafeVersion() {
+    const safeText = result.findings.length
+      ? result.findings.map((finding) => finding.rewrite).join("\n")
+      : text;
+    await copyToClipboard(safeText);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1400);
+  }
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -48,7 +76,13 @@ export default function RiskReviewPage() {
               ))}
             </div>
             <textarea value={text} onChange={(event) => setText(event.target.value)} className="min-h-[360px] w-full rounded-2xl border border-white/10 bg-slate-950/40 p-5 text-sm leading-7 text-white outline-none" />
-            <Button variant="secondary" onClick={() => setText(sampleDraft)}>填入风险样例</Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => setText(sampleDraft)}>填入风险样例</Button>
+              <Button variant="secondary" className="gap-2" onClick={copySafeVersion}>
+                <Copy className="h-4 w-4" />
+                {copied ? "已复制" : "复制安全版本"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

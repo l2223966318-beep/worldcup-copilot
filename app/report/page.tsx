@@ -1,7 +1,7 @@
 "use client";
 
 import { Copy, Download, FileText } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,15 +15,25 @@ import { reviewRisk } from "@/lib/ai/risk";
 import { generateTopics } from "@/lib/ai/topics";
 import { copyToClipboard, downloadTextFile } from "@/lib/download";
 import { useLocalStorageState } from "@/lib/local-store";
+import { createContentPackage, createPackageMarkdown, createPackageText } from "@/lib/services/exportService";
+import { readWorkflowState } from "@/lib/services/workflowStore";
+import type { ContentPackage, WorkflowState } from "@/types/workflow";
 
 export default function ReportPage() {
   const [matchId, setMatchId] = useLocalStorageState("worldcup.selectedMatchId", exampleMatches[0].id);
+  const [workflowState, setWorkflowState] = useState<WorkflowState | null>(null);
   const match = exampleMatches.find((item) => item.id === matchId) ?? exampleMatches[0];
   const topics = useMemo(() => generateTopics(match), [match]);
   const content = useMemo(() => generatePlatformContent(match, topics[0]), [match, topics]);
   const risk = useMemo(() => reviewRisk(content.weibo.longPost), [content]);
   const knowledge = knowledgeEntries[0];
-  const markdown = createMarkdownReport({ match, topics, content, risk, knowledge });
+  const fallbackMarkdown = createMarkdownReport({ match, topics, content, risk, knowledge });
+  const contentPackage = useMemo(() => buildPackageFromWorkflow(workflowState), [workflowState]);
+  const markdown = contentPackage ? createPackageMarkdown(contentPackage) : fallbackMarkdown;
+
+  useEffect(() => {
+    setWorkflowState(readWorkflowState());
+  }, []);
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -49,6 +59,12 @@ export default function ReportPage() {
               <Download className="h-4 w-4" />
               导出 Markdown
             </Button>
+            <Button variant="secondary" className="gap-2" onClick={() => downloadTextFile("worldcup-copilot-package.txt", contentPackage ? createPackageText(contentPackage) : markdown, "text/plain;charset=utf-8")}>
+              导出 TXT
+            </Button>
+            <Button variant="secondary" className="gap-2" onClick={() => downloadTextFile("worldcup-copilot-package.json", JSON.stringify(contentPackage ?? { fallback: true, markdown }, null, 2), "application/json;charset=utf-8")}>
+              导出 JSON
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -66,4 +82,23 @@ export default function ReportPage() {
       </Card>
     </div>
   );
+}
+
+function buildPackageFromWorkflow(workflowState: WorkflowState | null): ContentPackage | null {
+  if (!workflowState?.currentMatch || !workflowState.analysisResult || !workflowState.selectedTopic || !workflowState.generatedContent) {
+    return null;
+  }
+
+  return createContentPackage({
+    matchContext: workflowState.currentMatch,
+    analysis: workflowState.analysisResult,
+    selectedTopic: workflowState.selectedTopic,
+    platformDraft: workflowState.generatedContent,
+    reviewResult: workflowState.reviewResult ?? {
+      level: "低",
+      score: 10,
+      findings: [],
+      advice: "可发布"
+    }
+  });
 }
