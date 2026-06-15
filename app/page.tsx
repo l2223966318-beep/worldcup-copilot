@@ -55,13 +55,31 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const applyGlobalSearch = useCallback((query: string) => {
+    const trimmed = query.trim();
+    setHotQuery(query);
+    setDateFilter("");
+    setStatusFilter("all");
+    setCompetitionFilter("all");
+    setMatchSearchQuery(queryLooksLikeMatchSearch(trimmed) ? trimmed : "");
+  }, []);
+
   useEffect(() => {
     const query = new URLSearchParams(window.location.search).get("q");
     if (!query) return;
-    setHotQuery(query);
-    if (queryLooksLikeMatchSearch(query)) setMatchSearchQuery(query);
+    applyGlobalSearch(query);
     void runHotSearch(query);
-  }, [runHotSearch]);
+  }, [applyGlobalSearch, runHotSearch]);
+
+  useEffect(() => {
+    function handleGlobalSearch(event: Event) {
+      const detail = (event as CustomEvent<{ query?: string }>).detail;
+      applyGlobalSearch(detail?.query ?? "");
+    }
+
+    window.addEventListener("worldcup:global-search", handleGlobalSearch);
+    return () => window.removeEventListener("worldcup:global-search", handleGlobalSearch);
+  }, [applyGlobalSearch]);
 
   async function copyHotTopic(item: HotItem) {
     const text = `热点信号：${item.title}\n来源：${item.platform} / ${item.source}\n选题角度：${buildHotTopicAngle(item)}`;

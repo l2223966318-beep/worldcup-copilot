@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { ChangeEvent, FormEvent, useState } from "react";
 import { Clock3, Search, Settings, Trophy } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -14,11 +14,23 @@ export function Header() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
 
+  function emitGlobalSearch(query: string) {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(new CustomEvent("worldcup:global-search", { detail: { query } }));
+  }
+
+  function handleSearchChange(event: ChangeEvent<HTMLInputElement>) {
+    const query = event.target.value;
+    setSearchQuery(query);
+    emitGlobalSearch(query);
+  }
+
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const query = searchQuery.trim();
     if (!query) return;
-    router.push(`/?q=${encodeURIComponent(query)}#hot-search`);
+    emitGlobalSearch(query);
+    router.push(`/?q=${encodeURIComponent(query)}#opportunity-pool`);
   }
 
   return (
@@ -58,7 +70,7 @@ export function Header() {
             <Search className="h-4 w-4" />
             <input
               value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
+              onChange={handleSearchChange}
               className="min-w-0 flex-1 bg-transparent text-slate-700 outline-none placeholder:text-slate-400"
               placeholder="搜索比赛、球队、热点事件"
               aria-label="搜索比赛、球队、热点事件"
