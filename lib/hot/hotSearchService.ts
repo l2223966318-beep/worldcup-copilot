@@ -7,9 +7,15 @@ import type { HotItem, HotSearchPayload, HotSourceStatus } from "./types";
 const CACHE_TTL_MS = 60_000;
 const cache = new Map<string, { expiresAt: number; payload: HotSearchPayload }>();
 
-export async function searchHotSignals(query: string): Promise<HotSearchPayload> {
+type HotSearchOptions = {
+  tavilyApiKey?: string;
+  topHubDataApiKey?: string;
+};
+
+export async function searchHotSignals(query: string, options: HotSearchOptions = {}): Promise<HotSearchPayload> {
   const normalizedQuery = normalizeQuery(query);
-  const cached = cache.get(normalizedQuery);
+  const cacheKey = buildCacheKey(normalizedQuery, options);
+  const cached = cache.get(cacheKey);
   const now = Date.now();
 
   if (cached && cached.expiresAt > now) {
@@ -21,8 +27,8 @@ export async function searchHotSignals(query: string): Promise<HotSearchPayload>
   let liveSourceCount = 0;
 
   const [topHubResult, tavilyResult, dailyHotResult] = await Promise.allSettled([
-    fetchTopHubDataSearch(normalizedQuery),
-    fetchTavilySearch(normalizedQuery),
+    fetchTopHubDataSearch(normalizedQuery, options.topHubDataApiKey),
+    fetchTavilySearch(normalizedQuery, options.tavilyApiKey),
     fetchDailyHotFeeds()
   ]);
 
@@ -64,10 +70,18 @@ export async function searchHotSignals(query: string): Promise<HotSearchPayload>
       : createPayload("fallback", createFallbackHotItems(normalizedQuery), failures.join("；"));
 
   if (payload.sourceStatus === "live" || payload.sourceStatus === "partial") {
-    cache.set(normalizedQuery, { expiresAt: now + CACHE_TTL_MS, payload });
+    cache.set(cacheKey, { expiresAt: now + CACHE_TTL_MS, payload });
   }
 
   return payload;
+}
+
+function buildCacheKey(query: string, options: HotSearchOptions) {
+  const sourceKey = [
+    options.tavilyApiKey ? "tavily:client" : "tavily:env",
+    options.topHubDataApiKey ? "tophub:client" : "tophub:env"
+  ].join("|");
+  return `${query}::${sourceKey}`;
 }
 
 function createPayload(sourceStatus: HotSourceStatus, data: HotItem[], message?: string): HotSearchPayload {

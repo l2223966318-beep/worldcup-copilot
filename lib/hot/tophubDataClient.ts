@@ -1,7 +1,7 @@
 const DEFAULT_BASE_URL = "https://api.tophubdata.com";
 
-export async function fetchTopHubDataSearch(query: string) {
-  const apiKey = process.env.TOPHUBDATA_API_KEY;
+export async function fetchTopHubDataSearch(query: string, overrideApiKey?: string) {
+  const apiKey = overrideApiKey || process.env.TOPHUBDATA_API_KEY;
   if (!apiKey) return { ok: false as const, reason: "TOPHUBDATA_API_KEY is not configured." };
 
   const baseUrl = (process.env.TOPHUBDATA_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, "");

@@ -44,7 +44,10 @@ export default function DashboardPage() {
     setHotLoading(true);
     setHotError("");
     try {
-      const response = await fetch(`/api/hot/search?q=${encodeURIComponent(trimmed)}`, { cache: "no-store" });
+      const response = await fetch(`/api/hot/search?q=${encodeURIComponent(trimmed)}`, {
+        cache: "no-store",
+        headers: readHotSourceHeaders()
+      });
       if (!response.ok) throw new Error(`热点接口请求失败：${response.status}`);
       const result = (await response.json()) as HotSearchPayload;
       setHotPayload(result);
@@ -324,6 +327,23 @@ export default function DashboardPage() {
       </section>
     </div>
   );
+}
+
+function readHotSourceHeaders() {
+  const headers: Record<string, string> = {};
+  if (typeof window === "undefined") return headers;
+
+  try {
+    const raw = window.localStorage.getItem("worldcup.datasource.settings");
+    if (!raw) return headers;
+    const settings = JSON.parse(raw) as { tavilyKey?: string; topHubDataKey?: string };
+    if (settings.tavilyKey?.trim()) headers["x-worldcup-tavily-key"] = settings.tavilyKey.trim();
+    if (settings.topHubDataKey?.trim()) headers["x-worldcup-tophubdata-key"] = settings.topHubDataKey.trim();
+  } catch {
+    return headers;
+  }
+
+  return headers;
 }
 
 function HeroPattern({ theme }: { theme: SportTheme }) {

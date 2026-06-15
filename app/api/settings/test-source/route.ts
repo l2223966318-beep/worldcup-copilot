@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-type SourceKey = "apiFootball" | "tavily" | "deepseek" | "openai";
+type SourceKey = "apiFootball" | "tavily" | "topHubData" | "deepseek" | "openai";
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as { source?: SourceKey; apiKey?: string };
@@ -50,6 +50,15 @@ async function testSource(source: SourceKey, apiKey: string) {
     });
     if (!response.ok) throw new Error(`Tavily 返回 ${response.status}`);
     return { ok: true, mode: "live", message: "Tavily 连接成功。" };
+  }
+
+  if (source === "topHubData") {
+    const params = new URLSearchParams({ q: "世界杯", p: "1" });
+    const response = await fetchWithTimeout(`https://api.tophubdata.com/search?${params.toString()}`, {
+      headers: { Authorization: apiKey }
+    });
+    if (!response.ok) throw new Error(`榜眼数据返回 ${response.status}`);
+    return { ok: true, mode: "live", message: "今日热榜 / 榜眼数据连接成功。" };
   }
 
   if (source === "deepseek") {

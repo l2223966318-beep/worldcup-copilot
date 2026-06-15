@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, Loader2, PlugZap, Save, XCircle } from "lucide-react";
 
-type SourceKey = "apiFootball" | "tavily" | "deepseek" | "openai";
+type SourceKey = "apiFootball" | "tavily" | "topHubData" | "deepseek" | "openai";
 
 type SettingsState = {
   apiFootballKey: string;
   tavilyKey: string;
+  topHubDataKey: string;
   deepseekKey: string;
   openaiKey: string;
   manualHotSignals: string;
@@ -19,6 +20,7 @@ const STORAGE_KEY = "worldcup.datasource.settings";
 const sourceRows: Array<{ key: SourceKey; label: string; field: keyof SettingsState; hint: string }> = [
   { key: "apiFootball", label: "API-FOOTBALL", field: "apiFootballKey", hint: "用于正式足球赛程、比分、事件和技术统计。" },
   { key: "tavily", label: "Tavily", field: "tavilyKey", hint: "用于全网热点搜索和事件补充。" },
+  { key: "topHubData", label: "今日热榜 / 榜眼数据", field: "topHubDataKey", hint: "用于接入微博、抖音、B站等热榜数据源。" },
   { key: "deepseek", label: "DeepSeek", field: "deepseekKey", hint: "用于赛事分析、选题和内容生成增强。" },
   { key: "openai", label: "OpenAI", field: "openaiKey", hint: "可作为 DeepSeek 之外的模型配置空间。" }
 ];
@@ -26,6 +28,7 @@ const sourceRows: Array<{ key: SourceKey; label: string; field: keyof SettingsSt
 const defaultSettings: SettingsState = {
   apiFootballKey: "",
   tavilyKey: "",
+  topHubDataKey: "",
   deepseekKey: "",
   openaiKey: "",
   manualHotSignals: "美国队乌龙球\n韩国球员球衣被扯破\nVAR 判罚争议",
@@ -86,7 +89,7 @@ export default function SettingsPage() {
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <h1 className="text-3xl font-semibold tracking-normal text-slate-950">数据源设置</h1>
         <p className="mt-2 text-sm leading-6 text-slate-500">
-          API Key 只保存在当前浏览器 localStorage，真实线上调用仍优先读取 Vercel 环境变量。没有 Key 时系统自动进入 demo/mock 模式。
+          API Key 只保存在当前浏览器 localStorage。热点搜索会把 Tavily / 今日热榜 Key 临时发给本站服务端转发请求，不会写入代码；没有 Key 时系统自动进入 demo/mock 模式。
         </p>
       </section>
 

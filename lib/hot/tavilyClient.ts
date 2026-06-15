@@ -1,7 +1,7 @@
 const DEFAULT_BASE_URL = "https://api.tavily.com";
 
-export async function fetchTavilySearch(query: string) {
-  const apiKey = process.env.TAVILY_API_KEY;
+export async function fetchTavilySearch(query: string, overrideApiKey?: string) {
+  const apiKey = overrideApiKey || process.env.TAVILY_API_KEY;
   if (!apiKey) return { ok: false as const, reason: "TAVILY_API_KEY is not configured." };
 
   const baseUrl = (process.env.TAVILY_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, "");
