@@ -104,18 +104,29 @@ export function mergeHotItems(items: HotItem[]): HotItem[] {
       continue;
     }
 
+    const primary = sourcePriority(existing.source) >= sourcePriority(item.source) ? existing : item;
+    const supplement = primary === existing ? item : existing;
     merged.set(key, {
-      ...existing,
-      summary: existing.summary.length >= item.summary.length ? existing.summary : item.summary,
+      ...primary,
+      summary: primary.summary.length >= supplement.summary.length ? primary.summary : supplement.summary,
       relevance: Math.max(existing.relevance, item.relevance),
       tags: Array.from(new Set([...existing.tags, ...item.tags])),
       source: Array.from(new Set([...existing.source.split("+"), ...item.source.split("+")])).join("+"),
-      heat: existing.heat ?? item.heat,
+      heat: primary.heat ?? supplement.heat,
       rank: Math.min(existing.rank ?? 999, item.rank ?? 999)
     });
   }
 
-  return Array.from(merged.values()).sort((a, b) => b.relevance - a.relevance || (a.rank ?? 999) - (b.rank ?? 999));
+  return Array.from(merged.values()).sort(
+    (a, b) => sourcePriority(b.source) - sourcePriority(a.source) || b.relevance - a.relevance || (a.rank ?? 999) - (b.rank ?? 999)
+  );
+}
+
+function sourcePriority(source: string) {
+  if (/tophubdata|dailyhot/i.test(source)) return 3;
+  if (/tavily/i.test(source)) return 2;
+  if (/fallback|ai/i.test(source)) return 1;
+  return 0;
 }
 
 function createHotItem(input: {
