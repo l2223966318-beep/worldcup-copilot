@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCcw, Search, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { RefreshCcw, Search } from "lucide-react";
 
 import type { HotItem, HotSearchPayload, HotTopic } from "@/lib/hot/types";
-import { cleanList, qualityControl } from "@/lib/ai/quality";
+import { HOT_RADAR_CACHE_KEY, type HotRadarCache } from "@/lib/hot/hotTopicWorkflow";
 import { localizeTeamName } from "@/lib/services/footballNames";
 import type { WorldCupMatch } from "@/lib/sports/types";
 import type { SportTheme } from "@/lib/sport-theme";
@@ -12,22 +13,6 @@ import { formatBeijingDateTime } from "@/lib/time/beijingTime";
 
 type HotTab = "全部" | "体育相关" | "世界杯相关" | "可借势" | "高价值";
 
-type HotRadarCache = {
-  topics: HotTopic[];
-  lastUpdatedAt: string;
-  sourceStatus: HotSearchPayload["sourceStatus"];
-  message?: string;
-};
-
-type GeneratedHotPackage = {
-  bilibili: string[];
-  weibo: string[];
-  xiaohongshu: string[];
-  shortVideo: string[];
-  risk: string[];
-};
-
-const CACHE_KEY = "worldcup.hot-topic-radar.cache.v1";
 const tabs: HotTab[] = ["全部", "体育相关", "世界杯相关", "可借势", "高价值"];
 
 export function HotTopicRadarPanel({
@@ -39,14 +24,12 @@ export function HotTopicRadarPanel({
   matches: WorldCupMatch[];
   highlightedMatch?: WorldCupMatch | null;
 }) {
+  const router = useRouter();
   const [topics, setTopics] = useState<HotTopic[]>([]);
   const [lastUpdatedAt, setLastUpdatedAt] = useState("");
   const [sourceStatus, setSourceStatus] = useState<HotSearchPayload["sourceStatus"]>("fallback");
   const [message, setMessage] = useState("");
   const [activeTab, setActiveTab] = useState<HotTab>("全部");
-  const [selectedTopicId, setSelectedTopicId] = useState("");
-  const [generatedTopicId, setGeneratedTopicId] = useState("");
-  const [copied, setCopied] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -57,7 +40,6 @@ export function HotTopicRadarPanel({
     setLastUpdatedAt(cached.lastUpdatedAt);
     setSourceStatus(cached.sourceStatus);
     setMessage(cached.message ?? "");
-    setSelectedTopicId(cached.topics[0]?.id ?? "");
   }, []);
 
   const highlightedKeywords = useMemo(() => {
@@ -80,8 +62,11 @@ export function HotTopicRadarPanel({
   }, [topics, matches, highlightedKeywords]);
 
   const filteredTopics = useMemo(() => rankedTopics.filter((topic) => filterByTab(topic, activeTab)), [activeTab, rankedTopics]);
-  const selectedTopic = filteredTopics.find((topic) => topic.id === selectedTopicId) ?? filteredTopics[0] ?? rankedTopics[0];
-  const generatedPackage = selectedTopic && generatedTopicId === selectedTopic.id ? generateHotTopicPackage(selectedTopic, highlightedMatch ?? matches[0]) : null;
+
+  function openTopic(topic: HotTopic, mode: "analysis" | "generate" = "analysis") {
+    const query = mode === "generate" ? "?mode=generate" : "";
+    router.push(`/hot-topics/${encodeURIComponent(topic.id)}${query}`);
+  }
 
   async function updateHotTopics() {
     setLoading(true);
@@ -110,19 +95,11 @@ export function HotTopicRadarPanel({
       setLastUpdatedAt(payload.lastUpdated);
       setSourceStatus(payload.sourceStatus);
       setMessage(payload.message ?? "");
-      setSelectedTopicId(nextTopics[0]?.id ?? "");
-      setGeneratedTopicId("");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "热点更新失败。");
     } finally {
       setLoading(false);
     }
-  }
-
-  async function copyGenerated(text: string, key: string) {
-    await navigator.clipboard.writeText(text);
-    setCopied(key);
-    window.setTimeout(() => setCopied(""), 1200);
   }
 
   return (
@@ -188,14 +165,11 @@ export function HotTopicRadarPanel({
               return (
                 <article
                   key={topic.id}
-                  onClick={() => {
-                    setSelectedTopicId(topic.id);
-                    setGeneratedTopicId("");
-                  }}
+                  onClick={() => openTopic(topic)}
                   className={`block w-full cursor-pointer rounded-3xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-[0_14px_36px_rgba(15,23,42,0.08)] ${
-                    selectedTopic?.id === topic.id ? "bg-white" : "bg-slate-50"
+                    highlighted ? "bg-white" : "bg-slate-50"
                   }`}
-                  style={{ borderColor: highlighted || selectedTopic?.id === topic.id ? theme.primary : theme.border }}
+                  style={{ borderColor: highlighted ? theme.primary : theme.border }}
                 >
                   <div className="flex items-start gap-3">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black text-white" style={{ backgroundColor: highlighted ? theme.accent : theme.primary }}>
@@ -218,8 +192,7 @@ export function HotTopicRadarPanel({
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
-                            setSelectedTopicId(topic.id);
-                            setGeneratedTopicId("");
+                            openTopic(topic);
                           }}
                           className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:-translate-y-0.5"
                         >
@@ -229,8 +202,7 @@ export function HotTopicRadarPanel({
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
-                            setSelectedTopicId(topic.id);
-                            setGeneratedTopicId(topic.id);
+                            openTopic(topic, "generate");
                           }}
                           className="rounded-full px-3 py-1.5 text-xs font-semibold text-white transition hover:-translate-y-0.5"
                           style={{ backgroundColor: theme.primary }}
@@ -252,70 +224,8 @@ export function HotTopicRadarPanel({
           )}
         </div>
 
-        {selectedTopic ? (
-          <div className="mt-5 rounded-[28px] border bg-white p-4" style={{ borderColor: theme.border }}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-sm font-black text-slate-950">热点详情</div>
-              {selectedTopic.url ? (
-                <a href={selectedTopic.url} target="_blank" rel="noreferrer" className="text-xs font-semibold" style={{ color: theme.primary }}>
-                  查看来源
-                </a>
-              ) : null}
-            </div>
-            <h3 className="mt-3 text-xl font-black leading-7 text-slate-950">{selectedTopic.title}</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{selectedTopic.summary || "该热点暂无摘要，建议更新后结合来源链接人工确认。"}</p>
-            <DetailBlock title="为什么值得关注" items={buildWhyCare(selectedTopic)} />
-            <DetailBlock title="可借势内容方向" items={selectedTopic.contentAngles ?? []} />
-            <DetailBlock title="推荐关联赛事" items={selectedTopic.relatedMatches?.length ? selectedTopic.relatedMatches : ["暂无强关联赛事，可作为泛体育热点观察"]} />
-            <button
-              type="button"
-              onClick={() => setGeneratedTopicId(selectedTopic.id)}
-              className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold text-white transition hover:-translate-y-0.5"
-              style={{ backgroundColor: theme.primary }}
-            >
-              <Sparkles className="h-4 w-4" />
-              生成选题
-            </button>
-          </div>
-        ) : null}
-
-        {generatedPackage ? (
-          <div className="mt-4 rounded-[28px] border bg-slate-50 p-4" style={{ borderColor: theme.border }}>
-            <div className="text-sm font-black text-slate-950">热点选题包</div>
-            {Object.entries(generatedPackage).map(([key, lines]) => (
-              <div key={key} className="mt-4 rounded-2xl bg-white p-3 ring-1 ring-slate-200">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-xs font-black text-slate-500">{packageLabel(key)}</div>
-                  <button
-                    type="button"
-                    onClick={() => copyGenerated(lines.join("\n"), key)}
-                    className="text-xs font-semibold"
-                    style={{ color: theme.primary }}
-                  >
-                    {copied === key ? "已复制" : "复制"}
-                  </button>
-                </div>
-                <ul className="mt-2 space-y-1 text-xs leading-5 text-slate-600">
-                  {lines.map((line) => <li key={line}>· {line}</li>)}
-                </ul>
-              </div>
-            ))}
-          </div>
-        ) : null}
       </div>
     </aside>
-  );
-}
-
-function DetailBlock({ title, items }: { title: string; items: string[] }) {
-  if (!items.length) return null;
-  return (
-    <div className="mt-4">
-      <div className="text-xs font-black text-slate-500">{title}</div>
-      <ul className="mt-2 space-y-1 text-xs leading-5 text-slate-600">
-        {items.map((item) => <li key={item}>· {item}</li>)}
-      </ul>
-    </div>
   );
 }
 
@@ -330,7 +240,7 @@ function Badge({ children, strong }: { children: string | number; strong?: boole
 function readCache(): HotRadarCache | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(CACHE_KEY);
+    const raw = window.localStorage.getItem(HOT_RADAR_CACHE_KEY);
     return raw ? (JSON.parse(raw) as HotRadarCache) : null;
   } catch {
     return null;
@@ -339,7 +249,7 @@ function readCache(): HotRadarCache | null {
 
 function writeCache(cache: HotRadarCache) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+  window.localStorage.setItem(HOT_RADAR_CACHE_KEY, JSON.stringify(cache));
 }
 
 function readHotSourceHeaders() {
@@ -442,14 +352,6 @@ function buildContentAngles(title: string, text: string) {
   return angles;
 }
 
-function buildWhyCare(topic: HotTopic) {
-  return cleanList([
-    `${topic.source}信号显示它具备即时讨论价值。`,
-    topic.leverageValue === "高价值" ? "它和体育/世界杯语境关联强，可以直接进入选题判断。" : "它不是纯比赛数据，但可以作为泛热点借势素材。",
-    topic.category ? `当前分类为“${topic.category}”，适合先判断平台适配度再生成内容。` : "建议结合来源链接人工确认背景。"
-  ]);
-}
-
 function findRelatedMatches(topic: Pick<HotTopic, "title" | "summary" | "tags">, matches: WorldCupMatch[]) {
   const text = normalizeText(`${topic.title} ${topic.summary ?? ""} ${(topic.tags ?? []).join(" ")}`);
   const related = matches.filter((match) => buildMatchKeywords(match).some((keyword) => text.includes(normalizeText(keyword))));
@@ -483,41 +385,6 @@ function filterByTab(topic: HotTopic, tab: HotTab) {
   return topic.leverageValue === "高价值";
 }
 
-function generateHotTopicPackage(topic: HotTopic, match?: WorldCupMatch | null): GeneratedHotPackage {
-  const matchLabel = match ? `${localizeTeamName(match.homeTeam.name)} vs ${localizeTeamName(match.awayTeam.name)}` : "今日世界杯比赛";
-  const riskLine = /黑哨|黑幕|确认伤退|伤退|裁判|VAR|争议/i.test(`${topic.title} ${topic.summary ?? ""}`)
-    ? "风险提醒：不要直接定性，建议写成“引发讨论”“需核实”“从规则角度复盘”。"
-    : "风险提醒：避免夸大全网情绪，补充数据或来源后再发布。";
-
-  return qualityControl({
-    bilibili: [
-      `选题：${topic.title}背后，${matchLabel}还能怎么复盘？`,
-      "结构：热点开场 / 比赛事实 / 数据解释 / 平台讨论 / 评论区问题。",
-      "弹幕互动：你觉得这是比赛转折，还是赛后传播转折？"
-    ],
-    weibo: [
-      `话题：#${topic.title.replace(/\s+/g, "")}#`,
-      `短帖：先看热点，再回到${matchLabel}，这类事件最适合讨论“比赛之外的传播点”。`,
-      "讨论钩子：你会把它做成战术复盘、人设叙事，还是争议解释？"
-    ],
-    xiaohongshu: [
-      `标题：${topic.title}，看球新手也能懂的3个重点`,
-      "卡片：发生了什么 / 为什么会热 / 和比赛有什么关系 / 可以怎么表达 / 发布前避坑。",
-      "收藏理由：这套结构可以复用到其他赛后热点。"
-    ],
-    shortVideo: [
-      `前三秒：今天这个热点，不只是热闹，它能帮你重新看懂${matchLabel}。`,
-      "分镜：热点词条截图 / 比分卡 / 关键事件 / 一句话观点 / 评论区提问。",
-      "节奏：15秒讲发生了什么，30秒讲为什么值得做，60秒补充数据和风险。"
-    ],
-    risk: [
-      riskLine,
-      "发布建议：先确认来源，再把绝对判断改成可核实表达。",
-      "适合平台：微博承接讨论，B站做复盘，小红书做解释卡片，短视频做前置信号。"
-    ]
-  });
-}
-
 function buildUpdateQuery(match?: WorldCupMatch | null) {
   if (!match) return "世界杯 足球 今日热点";
   return `${localizeTeamName(match.homeTeam.name)} ${localizeTeamName(match.awayTeam.name)} 世界杯 足球 今日热点`;
@@ -547,17 +414,6 @@ function sourcePriority(source: HotTopic["source"]) {
   if (source === "今日热榜") return 3;
   if (source === "Tavily") return 2;
   return 1;
-}
-
-function packageLabel(key: string) {
-  const labels: Record<string, string> = {
-    bilibili: "B站选题",
-    weibo: "微博话题",
-    xiaohongshu: "小红书标题",
-    shortVideo: "短视频方向",
-    risk: "风险提醒"
-  };
-  return labels[key] ?? key;
 }
 
 function normalizeText(value: string) {

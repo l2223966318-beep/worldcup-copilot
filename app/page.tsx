@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, CheckCircle2, CircleDot, Flame, ShieldAlert, Sparkles, Trophy } from "lucide-react";
+import { ArrowRight, CheckCircle2, CircleDot, Flame, Palette, ShieldAlert, Sparkles, Trophy } from "lucide-react";
 
 import { HotTopicRadarPanel } from "@/components/worldcup/hot-topic-radar-panel";
 import { localizeCompetitionName, localizeMatchStatus, localizeRoundName, localizeTeamName } from "@/lib/services/footballNames";
@@ -121,7 +121,7 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(340px,3fr)]">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(360px,2fr)]">
         <div className="min-w-0 space-y-8">
           <section id="opportunity-pool">
             <div className="flex flex-wrap items-end justify-between gap-4">
@@ -286,35 +286,64 @@ function ThemeSideSelector({
   active: SportType;
   onChange: (sportType: SportType) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const activeTheme = sportThemes[active];
+
   return (
-    <div className="fixed bottom-5 left-4 z-40 rounded-[22px] border border-slate-200 bg-white/92 p-2 shadow-[0_18px_50px_rgba(15,23,42,0.12)] backdrop-blur lg:bottom-auto lg:top-28">
-      <div className="px-2 pb-2 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">主题</div>
-      <div className="flex gap-2 lg:flex-col">
-        {(Object.keys(sportThemes) as SportType[]).map((sportType) => {
-          const item = sportThemes[sportType];
-          const selected = active === sportType;
-          return (
-            <button
-              key={sportType}
-              type="button"
-              onClick={() => onChange(sportType)}
-              className={`group flex h-11 items-center gap-2 rounded-2xl px-3 text-left text-xs font-semibold transition hover:-translate-y-0.5 ${
-                selected ? "text-white shadow-md" : "bg-slate-50 text-slate-700 ring-1 ring-slate-200 hover:bg-white"
-              }`}
-              style={selected ? { backgroundColor: item.primary, boxShadow: `0 12px 28px ${item.heroGlow}` } : undefined}
-              aria-pressed={selected}
-              title={`${item.name}主题`}
-            >
-              <span className="flex -space-x-1">
-                {[item.primary, item.secondary, item.accent].map((color) => (
-                  <span key={color} className="h-4 w-4 rounded-full border border-white" style={{ backgroundColor: color }} />
-                ))}
-              </span>
-              <span>{item.name}</span>
+    <div className="fixed bottom-5 left-4 z-40">
+      {open ? (
+        <div className="mb-3 w-56 rounded-[22px] border border-slate-200 bg-white/95 p-2 shadow-[0_18px_50px_rgba(15,23,42,0.14)] backdrop-blur">
+          <div className="flex items-center justify-between px-2 pb-2">
+            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">主题</div>
+            <button type="button" onClick={() => setOpen(false)} className="rounded-full px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100">
+              收起
             </button>
-          );
-        })}
-      </div>
+          </div>
+          <div className="grid gap-2">
+            {(Object.keys(sportThemes) as SportType[]).map((sportType) => {
+              const item = sportThemes[sportType];
+              const selected = active === sportType;
+              return (
+                <button
+                  key={sportType}
+                  type="button"
+                  onClick={() => {
+                    onChange(sportType);
+                    setOpen(false);
+                  }}
+                  className={`group flex h-11 items-center justify-between rounded-2xl px-3 text-left text-xs font-semibold transition hover:-translate-y-0.5 ${
+                    selected ? "text-white shadow-md" : "bg-slate-50 text-slate-700 ring-1 ring-slate-200 hover:bg-white"
+                  }`}
+                  style={selected ? { backgroundColor: item.primary, boxShadow: `0 12px 28px ${item.heroGlow}` } : undefined}
+                  aria-pressed={selected}
+                  title={`${item.name}主题`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="flex -space-x-1">
+                      {[item.primary, item.secondary, item.accent].map((color) => (
+                        <span key={color} className="h-4 w-4 rounded-full border border-white" style={{ backgroundColor: color }} />
+                      ))}
+                    </span>
+                    <span>{item.name}</span>
+                  </span>
+                  {selected ? <span className="text-[11px] opacity-90">当前</span> : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="inline-flex h-12 items-center gap-2 rounded-full border border-slate-200 bg-white/95 px-4 text-sm font-semibold text-slate-800 shadow-[0_14px_40px_rgba(15,23,42,0.14)] backdrop-blur transition hover:-translate-y-0.5"
+        aria-expanded={open}
+      >
+        <span className="flex h-8 w-8 items-center justify-center rounded-full text-white" style={{ backgroundColor: activeTheme.primary }}>
+          <Palette className="h-4 w-4" />
+        </span>
+        <span>{activeTheme.name}主题</span>
+      </button>
     </div>
   );
 }
