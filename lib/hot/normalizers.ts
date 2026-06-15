@@ -173,12 +173,15 @@ function firstArray(root: AnyRecord, keys: string[]) {
   return [];
 }
 
-function findFirstArray(value: unknown): unknown[] {
+function findFirstArray(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown[] {
+  if (depth > 8) return [];
   if (Array.isArray(value)) return value;
   const record = asRecord(value);
   if (!record) return [];
+  if (seen.has(record)) return [];
+  seen.add(record);
   for (const key of ["data", "items", "list", "result", "results", "nodes"]) {
-    const found = findFirstArray(record[key]);
+    const found = findFirstArray(record[key], depth + 1, seen);
     if (found.length) return found;
   }
   return [];

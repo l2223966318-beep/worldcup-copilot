@@ -19,7 +19,7 @@ mkdirSync(outDir, { recursive: true });
 const modulePath = join(outDir, "normalizers.mjs");
 writeFileSync(modulePath, compiled, "utf8");
 
-const { mergeHotItems, normalizeDailyHotPayload, normalizeTavilyPayload } = await import(`file:///${modulePath.replaceAll("\\", "/")}`);
+const { mergeHotItems, normalizeDailyHotPayload, normalizeTavilyPayload, normalizeTopHubDataPayload } = await import(`file:///${modulePath.replaceAll("\\", "/")}`);
 
 const dailyHotItems = normalizeDailyHotPayload(
   {
@@ -66,5 +66,9 @@ const merged = mergeHotItems([...dailyHotItems, ...tavilyItems]);
 assert.equal(merged.length, 3);
 assert.equal(merged[0].url, "https://example.com/a");
 assert.ok(merged[0].relevance >= 90);
+
+const recursivePayload = {};
+recursivePayload.data = recursivePayload;
+assert.deepEqual(normalizeTopHubDataPayload(recursivePayload, { query: "世界杯" }), []);
 
 console.log(`hot search ok: ${merged.map((item) => item.source).join(", ")}`);
