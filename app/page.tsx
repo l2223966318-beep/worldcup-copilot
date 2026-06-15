@@ -72,25 +72,25 @@ export default function DashboardPage() {
   }, [applyGlobalSearch]);
 
   return (
-    <div className="relative mx-auto flex max-w-7xl flex-col gap-8 pb-16">
+    <div className="relative mx-auto flex max-w-7xl flex-col gap-6 pb-16">
       <ThemeSideSelector active={sportType} onChange={selectSportTheme} />
-      <section className={`relative overflow-hidden rounded-[40px] border bg-gradient-to-br ${theme.gradient} p-7 shadow-[0_28px_90px_rgba(15,23,42,0.08)] lg:p-10`} style={{ borderColor: theme.border }}>
+      <section className={`relative overflow-hidden rounded-[32px] border bg-gradient-to-br ${theme.gradient} p-5 shadow-[0_20px_70px_rgba(15,23,42,0.07)] lg:p-7`} style={{ borderColor: theme.border }}>
         <HeroPattern theme={theme} />
-        <div className="relative z-10 grid gap-8 lg:grid-cols-[1fr_380px] lg:items-end">
+        <div className="relative z-10 grid gap-5 lg:grid-cols-[1fr_320px] lg:items-center">
           <div>
-            <div className="inline-flex rounded-full bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm" style={{ color: theme.secondary }}>
+            <div className="inline-flex rounded-full bg-white/80 px-3 py-1.5 text-xs font-semibold shadow-sm" style={{ color: theme.secondary }}>
               当前项目：2026 世界杯内容运营
             </div>
-            <h1 className="mt-8 max-w-4xl text-5xl font-black leading-tight tracking-tight text-slate-950 lg:text-7xl">
+            <h1 className="mt-5 max-w-4xl text-4xl font-black leading-tight tracking-tight text-slate-950 lg:text-6xl">
               WorldCup Copilot
             </h1>
-            <p className="mt-5 max-w-2xl text-xl leading-9 text-slate-700">
+            <p className="mt-3 max-w-2xl text-base leading-7 text-slate-700 lg:text-lg">
               从赛事数据到平台分发，帮运营人员快速找到值得做的内容角度。
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-5 flex flex-wrap gap-3">
               <Link
                 href="#opportunity-pool"
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold text-white shadow-lg transition hover:-translate-y-0.5"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold text-white shadow-lg transition hover:-translate-y-0.5"
                 style={{ backgroundColor: theme.primary, boxShadow: `0 18px 38px ${theme.heroGlow}` }}
               >
                 查看今日比赛池
@@ -98,23 +98,23 @@ export default function DashboardPage() {
               </Link>
               <Link
                 href="/matches/argentina-france-2022-final"
-                className="inline-flex h-12 items-center justify-center rounded-full border border-white bg-white/85 px-5 text-sm font-semibold text-slate-900 shadow-sm transition hover:-translate-y-0.5"
+                className="inline-flex h-10 items-center justify-center rounded-full border border-white bg-white/85 px-4 text-sm font-semibold text-slate-900 shadow-sm transition hover:-translate-y-0.5"
               >
                 查看经典样例
               </Link>
             </div>
           </div>
-          <div className="rounded-[32px] border bg-white/85 p-6 shadow-xl shadow-slate-900/10 backdrop-blur" style={{ borderColor: theme.border }}>
+          <div className="rounded-[26px] border bg-white/85 p-4 shadow-lg shadow-slate-900/10 backdrop-blur" style={{ borderColor: theme.border }}>
             <div className="flex items-center gap-3">
-              <Trophy className="h-6 w-6" style={{ color: theme.primary }} />
-              <div className="text-lg font-semibold text-slate-950">今日运营建议</div>
+              <Trophy className="h-5 w-5" style={{ color: theme.primary }} />
+              <div className="text-base font-semibold text-slate-950">今日运营建议</div>
             </div>
-            <div className="mt-5 grid grid-cols-3 gap-3">
+            <div className="mt-3 grid grid-cols-3 gap-2">
               <HeroMetric label="优先做" value={priorityMatches.length} theme={theme} />
               <HeroMetric label="观望" value={watchMatches.length} theme={theme} />
               <HeroMetric label="不投入" value={0} theme={theme} />
             </div>
-            <div className="mt-5 rounded-2xl p-4 text-sm leading-6" style={{ backgroundColor: theme.background, color: theme.mutedText }}>
+            <div className="mt-3 rounded-2xl p-3 text-xs leading-5" style={{ backgroundColor: theme.background, color: theme.mutedText }}>
               今日主推内容方向：球星叙事 + 数据解释。风险提醒：避免黑幕、保送、确认伤退等定性表达。
             </div>
           </div>
@@ -272,9 +272,9 @@ function SectionTitle({ eyebrow, title, description }: { eyebrow: string; title:
 
 function HeroMetric({ label, value, theme }: { label: string; value: number; theme: SportTheme }) {
   return (
-    <div className="rounded-2xl bg-white p-4 text-center shadow-sm">
-      <div className="text-3xl font-black" style={{ color: theme.primary }}>{value}</div>
-      <div className="mt-1 text-xs font-semibold text-slate-500">{label}</div>
+    <div className="rounded-2xl bg-white p-3 text-center shadow-sm">
+      <div className="text-2xl font-black" style={{ color: theme.primary }}>{value}</div>
+      <div className="mt-0.5 text-[11px] font-semibold text-slate-500">{label}</div>
     </div>
   );
 }
