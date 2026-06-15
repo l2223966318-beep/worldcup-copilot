@@ -1,4 +1,5 @@
 import { createPayload } from "@/lib/sports/normalizers";
+import { inferStaticFixtureStatus } from "@/lib/sports/staticFixtureStatus";
 import type { MatchEvent, MatchStatistic, WorldCupMatch, WorldCupPayload } from "@/lib/sports/types";
 
 const WORLD_CUP_2026_LEAGUE = 1;
@@ -170,9 +171,10 @@ function normalizeWorldCup26Game(game: WorldCup26Game, stadiums: Map<string | un
   const awayName = game.away_team_name_en || game.away_team_label || "TBD";
   const homeScore = parseNullableNumber(game.home_score);
   const awayScore = parseNullableNumber(game.away_score);
-  const status = normalizeWorldCup26Status(game);
   const stadium = stadiums.get(game.stadium_id);
   const kickoffTime = localDateToIso(game.local_date);
+  const status = normalizeWorldCup26Status(game, kickoffTime);
+  const hasTrustedScore = hasTrustedWorldCup26Score(game);
 
   return {
     id: `wc26-${game.id ?? ""}`,
@@ -193,10 +195,10 @@ function normalizeWorldCup26Game(game: WorldCup26Game, stadiums: Map<string | un
       name: awayName
     },
     score: {
-      home: status === "scheduled" ? null : homeScore,
-      away: status === "scheduled" ? null : awayScore,
-      fulltime: homeScore !== null && awayScore !== null ? `${homeScore}-${awayScore}` : undefined,
-      display: status === "scheduled" ? "vs" : `${homeScore ?? 0}-${awayScore ?? 0}`
+      home: hasTrustedScore ? homeScore : null,
+      away: hasTrustedScore ? awayScore : null,
+      fulltime: hasTrustedScore && homeScore !== null && awayScore !== null ? `${homeScore}-${awayScore}` : undefined,
+      display: scoreDisplay(status, hasTrustedScore ? homeScore : null, hasTrustedScore ? awayScore : null)
     },
     venue: {
       id: parseNullableNumber(stadium?.id) ?? undefined,
@@ -217,6 +219,8 @@ function normalizeWorldCup26Game(game: WorldCup26Game, stadiums: Map<string | un
 function normalizeTheStatsApiFixture(fixture: TheStatsApiFixture): WorldCupMatch {
   const homeName = fixture.homeTeam ?? "TBD";
   const awayName = fixture.awayTeam ?? "TBD";
+  const kickoffTime = fixture.kickoffUtc ?? fixture.date ?? "";
+  const status = inferStaticFixtureStatus(kickoffTime);
 
   return {
     id: `wc26-${fixture.matchNumber ?? ""}`,
@@ -225,15 +229,15 @@ function normalizeTheStatsApiFixture(fixture: TheStatsApiFixture): WorldCupMatch
     season: WORLD_CUP_2026_SEASON,
     round: stageLabel(fixture.stage),
     group: fixture.group ? `Group ${fixture.group}` : undefined,
-    kickoffTime: fixture.kickoffUtc ?? fixture.date ?? "",
-    status: "scheduled",
-    statusText: "Scheduled",
+    kickoffTime,
+    status,
+    statusText: statusText(status),
     homeTeam: { name: homeName },
     awayTeam: { name: awayName },
     score: {
       home: null,
       away: null,
-      display: "vs"
+      display: status === "scheduled" ? "vs" : "待补比分"
     },
     venue: {
       name: fixture.stadium,
@@ -250,16 +254,28 @@ function normalizeTheStatsApiFixture(fixture: TheStatsApiFixture): WorldCupMatch
   };
 }
 
-function normalizeWorldCup26Status(game: WorldCup26Game): WorldCupMatch["status"] {
+function normalizeWorldCup26Status(game: WorldCup26Game, kickoffTime?: string): WorldCupMatch["status"] {
   if (game.finished === "TRUE" || game.time_elapsed === "finished") return "finished";
   if (game.time_elapsed && !["notstarted", "not_started", "0"].includes(game.time_elapsed.toLowerCase())) return "live";
-  return "scheduled";
+  return inferStaticFixtureStatus(kickoffTime);
+}
+
+function hasTrustedWorldCup26Score(game: WorldCup26Game) {
+  const elapsed = game.time_elapsed?.toLowerCase();
+  if (game.finished === "TRUE" || elapsed === "finished") return true;
+  return Boolean(elapsed && !["notstarted", "not_started", "0"].includes(elapsed));
 }
 
 function statusText(status: WorldCupMatch["status"], raw?: string) {
   if (status === "finished") return "Match Finished";
   if (status === "live") return raw ? `Live ${raw}` : "Live";
   return "Scheduled";
+}
+
+function scoreDisplay(status: WorldCupMatch["status"], homeScore: number | null, awayScore: number | null) {
+  if (status === "scheduled") return "vs";
+  if (homeScore !== null && awayScore !== null) return `${homeScore}-${awayScore}`;
+  return "待补比分";
 }
 
 function stageLabel(type?: string, matchday?: string) {

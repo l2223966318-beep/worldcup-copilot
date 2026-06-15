@@ -25,7 +25,8 @@ import {
 const WORLD_CUP_LEAGUE = 1;
 const DEFAULT_WORLD_CUP_SEASON = 2026;
 const WORLD_CUP_SEASON = getConfiguredWorldCupSeason();
-const CACHE_TTL_MS = 60_000;
+const FIXTURE_CACHE_TTL_MS = 30_000;
+const ACTIVE_CACHE_TTL_MS = 15_000;
 
 type CacheEntry<T> = {
   expiresAt: number;
@@ -36,10 +37,10 @@ const cache = new Map<string, CacheEntry<unknown>>();
 
 export async function getWorldCupFixtures() {
   if (shouldUseFreeWorldCup2026Source()) {
-    return cached("free-2026-fixtures", CACHE_TTL_MS, getFreeWorldCup2026Fixtures, fallbackList);
+    return cached("free-2026-fixtures", FIXTURE_CACHE_TTL_MS, getFreeWorldCup2026Fixtures, fallbackList);
   }
 
-  return cached("fixtures", CACHE_TTL_MS, async () => {
+  return cached("fixtures", FIXTURE_CACHE_TTL_MS, async () => {
     const payload = await apiFootballGet<ApiFootballFixture[]>("/fixtures", {
       league: WORLD_CUP_LEAGUE,
       season: WORLD_CUP_SEASON
@@ -52,10 +53,10 @@ export async function getWorldCupFixtures() {
 
 export async function getTodayWorldCupFixtures(date = getTodayDate()) {
   if (shouldUseFreeWorldCup2026Source()) {
-    return cached(`free-2026-fixtures-today-${date}`, 60_000, () => getFreeWorldCup2026Today(date), fallbackList);
+    return cached(`free-2026-fixtures-today-${date}`, ACTIVE_CACHE_TTL_MS, () => getFreeWorldCup2026Today(date), fallbackList);
   }
 
-  return cached(`fixtures-today-${date}`, 60_000, async () => {
+  return cached(`fixtures-today-${date}`, ACTIVE_CACHE_TTL_MS, async () => {
     const payload = await apiFootballGet<ApiFootballFixture[]>("/fixtures", {
       league: WORLD_CUP_LEAGUE,
       season: WORLD_CUP_SEASON,
@@ -92,13 +93,13 @@ export async function getWorldCupMatch(fixtureId: string) {
   if (shouldUseFreeWorldCup2026Source()) {
     return cached(
       `free-2026-match-${fixtureId}`,
-      60_000,
+      ACTIVE_CACHE_TTL_MS,
       () => getFreeWorldCup2026Match(fixtureId),
       (message) => createPayload("fallback", getFallbackMatch(fixtureId), message)
     );
   }
 
-  return cached(`match-${fixtureId}`, 60_000, async () => {
+  return cached(`match-${fixtureId}`, ACTIVE_CACHE_TTL_MS, async () => {
     const [fixturePayload, eventsPayload, statisticsPayload] = await Promise.all([
       apiFootballGet<ApiFootballFixture[]>("/fixtures", { id: fixtureId }),
       apiFootballGet<ApiFootballEvent[]>("/fixtures/events", { fixture: fixtureId }),

@@ -1052,10 +1052,10 @@ function buildMarkdown(title: string, topic: TopicIdea, content: PlatformContent
 }
 
 function getMatchRefreshMs(match: WorldCupMatch) {
-  if (match.status === "live") return 20_000;
+  if (match.status === "live") return 15_000;
   if (match.status === "finished") return undefined;
-  if (match.status === "scheduled") return 120_000;
-  return 60_000;
+  if (match.status === "scheduled") return 30_000;
+  return 30_000;
 }
 
 function matchRefreshPolicy(payload: WorldCupPayload<WorldCupMatch>) {
