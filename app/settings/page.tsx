@@ -55,12 +55,16 @@ export default function SettingsPage() {
     setSaved(false);
   }
 
-  function saveSettings() {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-    window.localStorage.setItem("worldcup.manualHotSignals", settings.manualHotSignals);
-    window.localStorage.setItem("worldcup.useMockData", String(settings.useMockData));
+  function persistSettings(nextSettings: SettingsState) {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSettings));
+    window.localStorage.setItem("worldcup.manualHotSignals", nextSettings.manualHotSignals);
+    window.localStorage.setItem("worldcup.useMockData", String(nextSettings.useMockData));
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1500);
+  }
+
+  function saveSettings() {
+    persistSettings(settings);
   }
 
   async function testConnection(row: (typeof sourceRows)[number]) {
@@ -73,7 +77,9 @@ export default function SettingsPage() {
         body: JSON.stringify({ source: row.key, apiKey })
       });
       const result = (await response.json()) as { ok: boolean; message: string; mode?: string };
-      setStatuses((current) => ({ ...current, [row.key]: result }));
+      const savedResult = result.ok ? { ...result, message: `${result.message} 已自动保存，可直接回首页搜索。` } : result;
+      setStatuses((current) => ({ ...current, [row.key]: savedResult }));
+      if (result.ok) persistSettings(settings);
     } catch (error) {
       setStatuses((current) => ({
         ...current,
