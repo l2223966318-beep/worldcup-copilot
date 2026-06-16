@@ -25,7 +25,7 @@ type HotTopicAiPayload = {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { topic?: HotTopic };
+    const body = (await request.json()) as { topic?: HotTopic; apiKey?: string };
     if (!body.topic) {
       return NextResponse.json(
         {
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
           })
         }
       ],
-      { timeoutMs: 30000 }
+      { timeoutMs: 30000, apiKey: body.apiKey }
     );
 
     if (!result.ok) {

@@ -26,12 +26,12 @@ export type DeepSeekJsonResult<T> =
 
 export async function generateDeepSeekJson<T>(
   messages: DeepSeekMessage[],
-  options: { timeoutMs?: number } = {}
+  options: { timeoutMs?: number; apiKey?: string; model?: string } = {}
 ): Promise<DeepSeekJsonResult<T>> {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
+  const apiKey = options.apiKey?.trim() || process.env.DEEPSEEK_API_KEY;
   if (!apiKey) return { ok: false, message: "DEEPSEEK_API_KEY is not configured." };
 
-  const model = process.env.DEEPSEEK_MODEL || DEFAULT_MODEL;
+  const model = options.model?.trim() || process.env.DEEPSEEK_MODEL || DEFAULT_MODEL;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 
