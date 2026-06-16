@@ -50,7 +50,7 @@ export function HotTopicRadarPanel({
         relatedMatches: topic.relatedMatches?.length ? topic.relatedMatches : findRelatedMatches(topic, matches)
       }))
       .sort((a, b) => {
-        return getTopicHeatScore(b) - getTopicHeatScore(a) || (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0) || (a.rank ?? 999) - (b.rank ?? 999);
+        return (b.valueScore ?? 0) - (a.valueScore ?? 0) || getTopicHeatScore(b) - getTopicHeatScore(a) || (a.rank ?? 999) - (b.rank ?? 999);
       });
   }, [topics, matches]);
 
@@ -227,7 +227,7 @@ export function HotTopicRadarPanel({
             <div className="rounded-[26px] border border-dashed border-slate-300 bg-slate-50 p-7 text-center">
               <Search className="mx-auto h-7 w-7 text-slate-400" />
               <div className="mt-3 text-base font-semibold text-slate-950">暂无热点数据</div>
-              <p className="mt-2 text-sm leading-6 text-slate-500">点击“更新热点”获取最新内容。页面不会自动频繁请求热点接口。</p>
+              <p className="mt-2 text-sm leading-6 text-slate-500">{emptyStateText(activeTab, message)}</p>
             </div>
           )}
         </div>
@@ -381,6 +381,16 @@ function filterByTab(topic: HotTopic, tab: HotTab) {
     头条: ["头条", "toutiao"]
   };
   return aliases[tab].some((keyword) => text.includes(keyword.toLowerCase()));
+}
+
+function emptyStateText(tab: HotTab, message: string) {
+  if (tab === "B站") {
+    return "B站热榜接口已接通，但当前 B站热榜里暂未筛到世界杯、足球或体育相关内容；系统不会用无关游戏/生活热榜冒充赛事热点。";
+  }
+  if (tab === "小红书") {
+    return message || "小红书没有可靠官方热榜源；请配置 XHS_HOT_API_URL，或配置 TAVILY_API_KEY 走小红书公开搜索。";
+  }
+  return message || "点击“更新热点”获取最新内容。页面不会自动频繁请求热点接口。";
 }
 
 function formatHotTime(value: string) {

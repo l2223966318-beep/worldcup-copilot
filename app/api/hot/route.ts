@@ -48,7 +48,7 @@ export async function GET(request: Request) {
   const source = searchParams.get("source") || "all";
   const scope = searchParams.get("scope") || "sports";
   const limit = clampLimit(searchParams.get("limit"));
-  const requestLimit = scope === "all" ? limit : Math.min(50, Math.max(limit * 3, 30));
+  const requestLimit = scope === "all" ? limit : Math.min(100, Math.max(limit * 5, 50));
   const useMock = process.env.NEXT_PUBLIC_USE_MOCK === "true";
 
   const apiKey = process.env.UAPIPRO_API_KEY?.trim();
