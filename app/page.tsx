@@ -508,18 +508,28 @@ function getOpportunityProfile(match: WorldCupMatch) {
 }
 
 function getOpportunityScore(match: WorldCupMatch) {
-  let score = 42;
+  let score = 18;
   const signals: string[] = [];
+  const kickoffMs = Date.parse(match.kickoffTime || "");
+  const hoursToKickoff = Number.isFinite(kickoffMs) ? (kickoffMs - Date.now()) / (1000 * 60 * 60) : undefined;
 
   if (match.status === "live") {
-    score += 26;
+    score += 34;
     signals.push("进行中");
   } else if (match.status === "finished") {
-    score += 18;
+    score += 16;
     signals.push("已结束可复盘");
   } else if (match.status === "scheduled") {
-    score += 8;
-    signals.push("赛前预热");
+    if (typeof hoursToKickoff === "number" && hoursToKickoff <= 6) {
+      score += 14;
+      signals.push("即将开赛");
+    } else if (typeof hoursToKickoff === "number" && hoursToKickoff <= 18) {
+      score += 10;
+      signals.push("今日开赛");
+    } else {
+      score += 5;
+      signals.push("赛前预热");
+    }
   }
 
   const roundText = `${match.round} ${match.group ?? ""}`.toLowerCase();
@@ -527,27 +537,36 @@ function getOpportunityScore(match: WorldCupMatch) {
     score += 18;
     signals.push("淘汰赛");
   } else if (/group|小组/.test(roundText)) {
-    score += 8;
+    score += 4;
     signals.push("小组赛");
   }
 
   const home = match.score.home;
   const away = match.score.away;
+  const hasConfirmedScore = typeof home === "number" && typeof away === "number";
   const totalGoals = typeof home === "number" && typeof away === "number" ? home + away : 0;
   const goalDiff = typeof home === "number" && typeof away === "number" ? Math.abs(home - away) : null;
 
+  if (hasConfirmedScore) {
+    score += 10;
+    signals.push("比分已确认");
+  } else if (match.status !== "scheduled") {
+    score -= 12;
+    signals.push("比分待确认");
+  }
+
   if (totalGoals >= 4) {
-    score += 12;
+    score += 10;
     signals.push("进球多");
   } else if (totalGoals >= 2) {
-    score += 7;
+    score += 5;
   }
 
   if (goalDiff === 0 && totalGoals > 0) {
-    score += 10;
+    score += 8;
     signals.push("比分胶着");
   } else if (goalDiff === 1) {
-    score += 8;
+    score += 6;
     signals.push("一球差");
   }
 
@@ -568,29 +587,46 @@ function getOpportunityScore(match: WorldCupMatch) {
     signals.push("争议/名场面");
   }
 
-  const statsCoverage = match.statistics.some((entry) =>
-    entry.values.some((value) => value.type !== "Data Coverage" && value.value !== null && value.value !== "")
+  const richStatsCoverage = match.statistics.some((entry) =>
+    entry.values.some((value) => {
+      if (value.type === "Data Coverage" || value.type === "Goals") return false;
+      return value.value !== null && value.value !== "";
+    })
   );
-  if (statsCoverage) {
-    score += 6;
+  if (richStatsCoverage) {
+    score += 8;
     signals.push("数据可讲");
+  } else if (hasConfirmedScore) {
+    score += 2;
+  }
+
+  if (!hasConfirmedScore && eventCount === 0 && !richStatsCoverage && match.status === "finished") {
+    score -= 10;
+    signals.push("信息偏少");
   }
 
   if (match.source.provider === "api-football") {
     score += 5;
     signals.push("实时接口");
+  } else if (match.source.provider === "worldcup26-free" && !hasConfirmedScore && eventCount === 0) {
+    score -= 4;
   }
 
   return {
     score: Math.max(0, Math.min(99, score)),
-    signals
+    signals: dedupeSignals(signals)
   };
 }
 
 function priorityColor(priority: string, theme: SportTheme) {
   if (priority === "S") return theme.primary;
   if (priority === "A") return theme.accent;
+  if (priority === "C") return "#94a3b8";
   return theme.secondary;
+}
+
+function dedupeSignals(signals: string[]) {
+  return Array.from(new Set(signals));
 }
 
 function sourceLabel(status: SourceStatus) {
