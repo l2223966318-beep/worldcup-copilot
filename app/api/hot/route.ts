@@ -18,6 +18,99 @@ const HOT_TYPE_MAP: Record<string, string> = {
   toutiao: "toutiao"
 };
 
+const SPORTS_STRONG_KEYWORDS = [
+  "\u4e16\u754c\u676f",
+  "\u8db3\u7403",
+  "\u7537\u8db3",
+  "\u5973\u8db3",
+  "\u56fd\u8db3",
+  "\u8db3\u7403\u8d5b",
+  "\u70b9\u7403",
+  "\u70b9\u7403\u5927\u6218",
+  "\u4e4c\u9f99\u7403",
+  "\u7ea2\u724c",
+  "\u9ec4\u724c",
+  "\u5e3d\u5b50\u620f\u6cd5",
+  "\u4f24\u9000",
+  "\u8865\u65f6",
+  "var",
+  "fifa",
+  "worldcup"
+].map(normalizeComparableText);
+
+const SPORTS_MEDIUM_KEYWORDS = [
+  "\u6bd4\u8d5b",
+  "\u8d5b\u540e",
+  "\u7403\u5458",
+  "\u7403\u961f",
+  "\u7403\u8ff7",
+  "\u6559\u7ec3",
+  "\u95e8\u5c06",
+  "\u524d\u950b",
+  "\u4e2d\u573a",
+  "\u540e\u536b",
+  "\u5c04\u95e8",
+  "\u5c04\u6b63",
+  "\u63a7\u7403",
+  "\u89d2\u7403",
+  "\u8d8a\u4f4d",
+  "\u88c1\u5224",
+  "\u8d5b\u573a",
+  "\u664b\u7ea7",
+  "\u51fa\u7ebf",
+  "\u51b3\u8d5b",
+  "\u5c0f\u7ec4\u8d5b",
+  "\u9884\u9009\u8d5b",
+  "\u6dd8\u6c70\u8d5b"
+].map(normalizeComparableText);
+
+const TEAM_AND_COUNTRY_KEYWORDS = [
+  "\u4e2d\u56fd",
+  "\u4e2d\u56fd\u961f",
+  "\u7f8e\u56fd",
+  "\u65e5\u672c",
+  "\u97e9\u56fd",
+  "\u5fb7\u56fd",
+  "\u6cd5\u56fd",
+  "\u82f1\u683c\u5170",
+  "\u897f\u73ed\u7259",
+  "\u8461\u8404\u7259",
+  "\u963f\u6839\u5ef7",
+  "\u5df4\u897f",
+  "\u610f\u5927\u5229",
+  "\u8377\u5170",
+  "\u6bd4\u5229\u65f6",
+  "\u514b\u7f57\u5730\u4e9a",
+  "\u6377\u514b",
+  "\u4e39\u9ea6",
+  "\u58a8\u897f\u54e5",
+  "\u52a0\u62ff\u5927",
+  "\u5361\u5854\u5c14",
+  "\u4f0a\u6717",
+  "\u65b0\u897f\u5170",
+  "\u6469\u6d1b\u54e5",
+  "\u745e\u58eb",
+  "\u6ce2\u5170",
+  "\u6fb3\u5927\u5229\u4e9a",
+  "\u6c99\u7279",
+  "\u4e4c\u62c9\u572d",
+  "\u54e5\u4f26\u6bd4\u4e9a"
+].map(normalizeComparableText);
+
+const PLAYER_KEYWORDS = [
+  "\u6885\u897f",
+  "\u59c6\u5df4\u4f69",
+  "\u5185\u9a6c\u5c14",
+  "\u7f57\u7eb3\u5c14\u591a",
+  "c\u7f57",
+  "\u54c8\u5170\u5fb7",
+  "\u8d1d\u6797\u5384\u59c6",
+  "\u83ab\u5fb7\u91cc\u5947",
+  "\u5b59\u5174\u615c",
+  "\u4e09\u7b18\u85b0",
+  "\u4e45\u4fdd\u5efa\u82f1"
+].map(normalizeComparableText);
+
 const MESSAGE = {
   mockUnconfigured: "\u70ed\u70b9 API \u672a\u914d\u7f6e\uff0c\u5f53\u524d\u4f7f\u7528\u6f14\u793a\u6570\u636e\u3002",
   unconfigured:
@@ -27,7 +120,10 @@ const MESSAGE = {
   mockFailed: "\u70ed\u70b9 API \u8bf7\u6c42\u5931\u8d25\uff0c\u5f53\u524d\u4f7f\u7528\u6f14\u793a\u6570\u636e\u3002",
   failed:
     "\u70ed\u70b9 API \u8bf7\u6c42\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u63a5\u53e3\u5730\u5740\u3001\u5bc6\u94a5\u6216\u7f51\u7edc\u72b6\u6001\u3002",
+  noSports:
+    "\u5df2\u83b7\u53d6\u70ed\u699c\u6570\u636e\uff0c\u4f46\u6682\u672a\u5339\u914d\u5230\u4e16\u754c\u676f\u3001\u8db3\u7403\u6216\u4f53\u80b2\u76f8\u5173\u70ed\u70b9\u3002",
   realTag: "\u771f\u5b9e\u70ed\u70b9",
+  sportsTag: "\u4f53\u80b2\u76f8\u5173",
   demoData: "\u6f14\u793a\u6570\u636e",
   demoTitle: "\u4e16\u754c\u676f\u8d5b\u540e\u70ed\u70b9\u6837\u4f8b\uff1a\u4e4c\u9f99\u7403\u5f15\u53d1\u8ba8\u8bba",
   demoSummary: "\u8fd9\u662f\u6f14\u793a\u6570\u636e\uff0c\u4ec5\u7528\u4e8e\u672c\u5730\u529f\u80fd\u94fe\u8def\u6f14\u793a\u3002",
@@ -37,7 +133,9 @@ const MESSAGE = {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const source = searchParams.get("source") || "all";
+  const scope = searchParams.get("scope") || "sports";
   const limit = clampLimit(searchParams.get("limit"));
+  const requestLimit = scope === "all" ? limit : Math.min(50, Math.max(limit * 3, 30));
   const useMock = process.env.NEXT_PUBLIC_USE_MOCK === "true";
 
   const apiKey = process.env.UAPIPRO_API_KEY?.trim();
@@ -54,13 +152,15 @@ export async function GET(request: Request) {
   try {
     const hotTypes = getRequestedTypes(source);
     const settled = await Promise.allSettled(
-      hotTypes.map((type) => fetchUApiHotItems({ apiKey, baseUrl, endpoint, type, limit }))
+      hotTypes.map((type) => fetchUApiHotItems({ apiKey, baseUrl, endpoint, type, limit: requestLimit }))
     );
     const failures = settled.filter((result) => result.status === "rejected");
     const items = settled
       .flatMap((result) => (result.status === "fulfilled" ? result.value : []))
       .filter((item) => item.title)
       .filter((item) => source === "all" || matchSource(item, source))
+      .map(enrichSportsRelevance)
+      .filter((item) => scope === "all" || isSportsRelated(item))
       .filter(dedupeByTitle)
       .sort(sortByHeatAndRank)
       .slice(0, limit);
@@ -69,7 +169,7 @@ export async function GET(request: Request) {
       return NextResponse.json(createPayload("error", [], MESSAGE.failed), { status: 502 });
     }
 
-    return NextResponse.json(createPayload("live", items, items.length ? undefined : MESSAGE.empty));
+    return NextResponse.json(createPayload("live", items, items.length ? undefined : scope === "all" ? MESSAGE.empty : MESSAGE.noSports));
   } catch (error) {
     console.error("[hot-api] UApiPro request exception", { error: error instanceof Error ? error.message : String(error) });
     if (useMock) {
@@ -258,6 +358,42 @@ function getRequestedTypes(source: string) {
 function dedupeByTitle(item: HotItem, index: number, items: HotItem[]) {
   const current = normalizeComparableText(item.title);
   return items.findIndex((candidate) => normalizeComparableText(candidate.title) === current) === index;
+}
+
+function enrichSportsRelevance(item: HotItem): HotItem {
+  const sportsScore = getSportsRelevanceScore(item);
+  if (sportsScore <= 0) return item;
+  return {
+    ...item,
+    relevance: Math.min(100, Math.max(item.relevance, sportsScore)),
+    tags: Array.from(new Set([...(item.tags ?? []), MESSAGE.sportsTag]))
+  };
+}
+
+function isSportsRelated(item: HotItem) {
+  return getSportsRelevanceScore(item) >= 25;
+}
+
+function getSportsRelevanceScore(item: HotItem) {
+  const text = normalizeComparableText(`${item.title} ${item.summary ?? ""}`);
+  if (!text) return 0;
+  let score = 0;
+
+  for (const keyword of SPORTS_STRONG_KEYWORDS) {
+    if (text.includes(keyword)) score += 45;
+  }
+  for (const keyword of SPORTS_MEDIUM_KEYWORDS) {
+    if (text.includes(keyword)) score += 24;
+  }
+  for (const keyword of TEAM_AND_COUNTRY_KEYWORDS) {
+    if (text.includes(keyword)) score += 18;
+  }
+  for (const keyword of PLAYER_KEYWORDS) {
+    if (text.includes(keyword)) score += 20;
+  }
+  if (/\d{1,2}[:比-]\d{1,2}/u.test(`${item.title} ${item.summary ?? ""}`)) score += 24;
+
+  return Math.min(100, score);
 }
 
 function normalizeComparableText(value: string) {

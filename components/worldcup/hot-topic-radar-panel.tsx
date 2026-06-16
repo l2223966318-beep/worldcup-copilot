@@ -66,7 +66,7 @@ export function HotTopicRadarPanel({
     setError("");
 
     try {
-      const response = await fetch("/api/hot?source=all&limit=20", { cache: "no-store" });
+      const response = await fetch("/api/hot?source=all&scope=sports&limit=20", { cache: "no-store" });
       const payload = (await response.json().catch(() => null)) as HotSearchPayload | null;
       if (!response.ok) throw new Error(payload?.message || `热点 API 请求失败：${response.status}`);
       if (!payload) throw new Error("热点 API 返回格式不可读取。");
