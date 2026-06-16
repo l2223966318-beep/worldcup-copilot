@@ -8,8 +8,10 @@ export type HotItem = {
   source: string;
   platform: string;
   rank?: number;
-  heat?: string;
+  heat?: string | number;
+  hot?: string | number;
   publishedAt?: string;
+  time?: string;
   relevance: number;
   tags: string[];
 };

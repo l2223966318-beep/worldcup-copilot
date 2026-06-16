@@ -11,9 +11,9 @@ import type { WorldCupMatch } from "@/lib/sports/types";
 import type { SportTheme } from "@/lib/sport-theme";
 import { formatBeijingDateTime } from "@/lib/time/beijingTime";
 
-type HotTab = "全部" | "体育相关" | "世界杯相关" | "可借势" | "高价值";
+type HotTab = "全部" | "微博" | "B站" | "抖音" | "知乎" | "百度" | "头条";
 
-const tabs: HotTab[] = ["全部", "体育相关", "世界杯相关", "可借势", "高价值"];
+const tabs: HotTab[] = ["全部", "微博", "B站", "抖音", "知乎", "百度", "头条"];
 
 export function HotTopicRadarPanel({
   theme,
@@ -23,6 +23,7 @@ export function HotTopicRadarPanel({
   matches: WorldCupMatch[];
 }) {
   const router = useRouter();
+  const allowMock = process.env.NEXT_PUBLIC_USE_MOCK === "true";
   const [topics, setTopics] = useState<HotTopic[]>([]);
   const [lastUpdatedAt, setLastUpdatedAt] = useState("");
   const [sourceStatus, setSourceStatus] = useState<HotSearchPayload["sourceStatus"]>("fallback");
@@ -34,11 +35,12 @@ export function HotTopicRadarPanel({
   useEffect(() => {
     const cached = readCache();
     if (!cached) return;
+    if (cached.sourceStatus === "fallback" && !allowMock) return;
     setTopics(cached.topics);
     setLastUpdatedAt(cached.lastUpdatedAt);
     setSourceStatus(cached.sourceStatus);
     setMessage(cached.message ?? "");
-  }, []);
+  }, [allowMock]);
 
   const rankedTopics = useMemo(() => {
     return topics
@@ -64,14 +66,12 @@ export function HotTopicRadarPanel({
     setError("");
 
     try {
-      const query = buildUpdateQuery();
-      const response = await fetch(`/api/hot/search?q=${encodeURIComponent(query)}`, {
-        cache: "no-store",
-        headers: readHotSourceHeaders()
-      });
-      if (!response.ok) throw new Error(`热点接口请求失败：${response.status}`);
+      const response = await fetch("/api/hot?source=all&limit=20", { cache: "no-store" });
+      const payload = (await response.json().catch(() => null)) as HotSearchPayload | null;
+      if (!response.ok) throw new Error(payload?.message || `热点 API 请求失败：${response.status}`);
+      if (!payload) throw new Error("热点 API 返回格式不可读取。");
+      if (payload.sourceStatus === "error") throw new Error(payload.message || "热点 API 请求失败。");
 
-      const payload = (await response.json()) as HotSearchPayload;
       const nextTopics = normalizeHotTopics(payload.data, matches, payload.lastUpdated);
       if (!nextTopics.length) throw new Error(payload.message || "热点接口没有返回可展示数据。");
 
@@ -88,6 +88,12 @@ export function HotTopicRadarPanel({
       setMessage(payload.message ?? "");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "热点更新失败。");
+      setSourceStatus("error");
+      setMessage("");
+      if (!allowMock && sourceStatus === "fallback") {
+        setTopics([]);
+        setLastUpdatedAt("");
+      }
     } finally {
       setLoading(false);
     }
@@ -115,8 +121,8 @@ export function HotTopicRadarPanel({
 
         <div className="mt-4 rounded-2xl p-4 text-xs leading-6" style={{ backgroundColor: theme.background, color: theme.mutedText }}>
           <div className="font-semibold text-slate-800">数据源状态</div>
-          <div>今日热榜：主数据源</div>
-          <div>全网搜索：补充数据源，不覆盖今日热榜</div>
+          <div>热点 API：UApiPro 每日热榜 / 热点信息</div>
+          <div>来源定位：赛事热点补充数据源</div>
           <div>智能筛选：分类、标签和借势价值加工层</div>
           <div>排序逻辑：按全网热度优先，不随左侧比赛切换。</div>
           <div className="mt-2 font-semibold">
@@ -126,7 +132,12 @@ export function HotTopicRadarPanel({
         </div>
 
         {message ? <div className="mt-3 text-xs leading-5 text-slate-500">{message}</div> : null}
-        {error ? <div className="mt-3 rounded-2xl bg-red-50 px-4 py-3 text-xs font-semibold text-red-600">{error} 旧缓存已保留。</div> : null}
+        {error ? (
+          <div className="mt-3 rounded-2xl bg-red-50 px-4 py-3 text-xs font-semibold text-red-600">
+            {error}
+            {topics.length ? " 已保留最近一次可用数据。" : ""}
+          </div>
+        ) : null}
 
         <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
           {tabs.map((tab) => (
@@ -159,7 +170,19 @@ export function HotTopicRadarPanel({
                       {topic.rank ?? index + 1}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="line-clamp-2 text-base font-black leading-6 text-slate-950">{topic.title}</div>
+                      {topic.url ? (
+                        <a
+                          href={topic.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(event) => event.stopPropagation()}
+                          className="line-clamp-2 text-base font-black leading-6 text-slate-950 transition hover:text-emerald-700"
+                        >
+                          {topic.title}
+                        </a>
+                      ) : (
+                        <div className="line-clamp-2 text-base font-black leading-6 text-slate-950">{topic.title}</div>
+                      )}
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         <Badge>{topic.platform ?? "全网"}</Badge>
                         <Badge>{topic.source}</Badge>
@@ -170,6 +193,7 @@ export function HotTopicRadarPanel({
                       <div className="mt-2 text-xs font-semibold" style={{ color: theme.secondary }}>
                         热度：{topic.heat ?? topic.relevanceScore ?? "-"}
                       </div>
+                      {topic.updatedAt ? <div className="mt-1 text-[11px] font-semibold text-slate-400">发布时间：{formatHotTime(topic.updatedAt)}</div> : null}
                       <div className="mt-3 flex flex-wrap gap-2">
                         <button
                           type="button"
@@ -235,23 +259,6 @@ function writeCache(cache: HotRadarCache) {
   window.localStorage.setItem(HOT_RADAR_CACHE_KEY, JSON.stringify(cache));
 }
 
-function readHotSourceHeaders() {
-  const headers: Record<string, string> = {};
-  if (typeof window === "undefined") return headers;
-
-  try {
-    const raw = window.localStorage.getItem("worldcup.datasource.settings");
-    if (!raw) return headers;
-    const settings = JSON.parse(raw) as { tavilyKey?: string; topHubDataKey?: string };
-    if (settings.tavilyKey?.trim()) headers["x-worldcup-tavily-key"] = settings.tavilyKey.trim();
-    if (settings.topHubDataKey?.trim()) headers["x-worldcup-tophubdata-key"] = settings.topHubDataKey.trim();
-  } catch {
-    return headers;
-  }
-
-  return headers;
-}
-
 function normalizeHotTopics(items: HotItem[], matches: WorldCupMatch[], updatedAt: string): HotTopic[] {
   const seen = new Map<string, HotTopic>();
 
@@ -263,14 +270,14 @@ function normalizeHotTopics(items: HotItem[], matches: WorldCupMatch[], updatedA
       rank: item.rank,
       title: item.title,
       summary: item.summary,
-      heat: item.heat,
+      heat: item.heat ?? item.hot,
       platform: item.platform,
       source,
       category: classifyCategory(text),
       relevanceScore: item.relevance,
       leverageValue: classifyLeverage(text, item.relevance),
       tags: Array.from(new Set([...(item.tags ?? []), ...buildTags(text)])),
-      updatedAt,
+      updatedAt: item.publishedAt ?? item.time ?? updatedAt,
       url: item.url,
       contentAngles: buildContentAngles(item.title, text),
       relatedMatches: findRelatedMatches({ title: item.title, summary: item.summary, tags: item.tags }, matches)
@@ -357,14 +364,16 @@ function buildMatchKeywords(match: WorldCupMatch) {
 
 function filterByTab(topic: HotTopic, tab: HotTab) {
   if (tab === "全部") return true;
-  if (tab === "体育相关") return topic.category === "体育" || topic.category === "世界杯";
-  if (tab === "世界杯相关") return topic.category === "世界杯" || topic.tags?.includes("世界杯");
-  if (tab === "可借势") return topic.leverageValue === "高价值" || topic.leverageValue === "可尝试";
-  return topic.leverageValue === "高价值";
-}
-
-function buildUpdateQuery() {
-  return "世界杯 足球 今日热点";
+  const text = `${topic.source} ${topic.platform ?? ""}`.toLowerCase();
+  const aliases: Record<Exclude<HotTab, "全部">, string[]> = {
+    微博: ["微博", "weibo"],
+    B站: ["b站", "bilibili", "哔哩"],
+    抖音: ["抖音", "douyin"],
+    知乎: ["知乎", "zhihu"],
+    百度: ["百度", "baidu"],
+    头条: ["头条", "toutiao"]
+  };
+  return aliases[tab].some((keyword) => text.includes(keyword.toLowerCase()));
 }
 
 function formatHotTime(value: string) {
