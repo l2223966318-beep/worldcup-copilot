@@ -4,17 +4,34 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { ArrowLeft, Clipboard, ExternalLink, Sparkles } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clipboard, ExternalLink, Save, ShieldCheck, Sparkles } from "lucide-react";
 
 import type { HotTopic } from "@/lib/hot/types";
 import {
-  buildWhyCare,
-  generateHotTopicPackage,
+  auditHotDraft,
+  buildHotAnalysis,
+  buildTopicIntro,
+  generateHotDraft,
   HOT_RADAR_CACHE_KEY,
-  packageLabel,
+  type HotAuditResult,
+  type HotGenerationConfig,
   type HotRadarCache
 } from "@/lib/hot/hotTopicWorkflow";
 import { formatBeijingDateTime } from "@/lib/time/beijingTime";
+
+const defaultConfig: HotGenerationConfig = {
+  platform: "B站",
+  contentType: "选题",
+  tone: "客观资讯",
+  length: "中",
+  useMatchFacts: false,
+  includeRiskReminder: true
+};
+
+const platforms: HotGenerationConfig["platform"][] = ["B站", "微博", "小红书", "抖音", "通用"];
+const contentTypes: HotGenerationConfig["contentType"][] = ["选题", "标题", "短文案", "视频脚本", "评论区互动问题", "图文卡片结构"];
+const tones: HotGenerationConfig["tone"][] = ["客观资讯", "球迷讨论", "轻松整活", "专业分析"];
+const lengths: HotGenerationConfig["length"][] = ["短", "中", "长"];
 
 export default function HotTopicDetailPage() {
   const params = useParams();
@@ -24,8 +41,14 @@ export default function HotTopicDetailPage() {
   const [topic, setTopic] = useState<HotTopic | null>(null);
   const [cacheMeta, setCacheMeta] = useState<{ lastUpdatedAt?: string; message?: string }>({});
   const [loaded, setLoaded] = useState(false);
-  const [showPackage, setShowPackage] = useState(searchParams.get("mode") === "generate");
+  const [config, setConfig] = useState<HotGenerationConfig>(() => ({
+    ...defaultConfig,
+    contentType: searchParams.get("mode") === "generate" ? "选题" : "选题"
+  }));
+  const [draft, setDraft] = useState("");
+  const [audit, setAudit] = useState<HotAuditResult | null>(null);
   const [copied, setCopied] = useState("");
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     try {
@@ -42,10 +65,23 @@ export default function HotTopicDetailPage() {
     }
   }, [topicId]);
 
-  const packageData = useMemo(() => {
-    if (!topic || !showPackage) return null;
-    return generateHotTopicPackage(topic, topic.relatedMatches?.[0] ?? "今日世界杯比赛");
-  }, [showPackage, topic]);
+  const analysis = useMemo(() => (topic ? buildHotAnalysis(topic) : null), [topic]);
+
+  function updateConfig<Key extends keyof HotGenerationConfig>(key: Key, value: HotGenerationConfig[Key]) {
+    setConfig((current) => ({ ...current, [key]: value }));
+  }
+
+  function generateDraft() {
+    if (!topic) return;
+    setDraft(generateHotDraft(topic, config));
+    setAudit(null);
+    setSaved(false);
+  }
+
+  function reviewDraft() {
+    if (!topic || !draft.trim()) return;
+    setAudit(auditHotDraft(draft, topic, config.platform));
+  }
 
   async function copyText(text: string, key: string) {
     await navigator.clipboard.writeText(text);
@@ -53,29 +89,38 @@ export default function HotTopicDetailPage() {
     window.setTimeout(() => setCopied(""), 1200);
   }
 
+  function saveDraft() {
+    if (!topic || !draft.trim()) return;
+    const key = "worldcup.hot-topic-drafts.v1";
+    const raw = window.localStorage.getItem(key);
+    const list = raw ? JSON.parse(raw) : [];
+    list.unshift({
+      topicId: topic.id,
+      title: topic.title,
+      config,
+      draft,
+      savedAt: new Date().toISOString()
+    });
+    window.localStorage.setItem(key, JSON.stringify(list.slice(0, 20)));
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 1500);
+  }
+
   if (!loaded) {
-    return (
-      <div className="mx-auto max-w-5xl rounded-[32px] border border-slate-200 bg-white p-10 text-slate-600 shadow-sm">
-        正在读取热点缓存...
-      </div>
-    );
+    return <EmptyCard>正在读取热点缓存...</EmptyCard>;
   }
 
   if (!topic) {
     return (
-      <div className="mx-auto max-w-5xl rounded-[32px] border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
+      <EmptyCard>
         <div className="text-2xl font-black text-slate-950">暂无该热点缓存</div>
         <p className="mt-3 text-sm leading-6 text-slate-500">请回到首页点击“更新热点”获取最新内容，再进入热点分析与生产页面。</p>
         <Link href="/" className="mt-6 inline-flex h-11 items-center justify-center rounded-full bg-emerald-600 px-5 text-sm font-semibold text-white transition hover:-translate-y-0.5">
           返回首页
         </Link>
-      </div>
+      </EmptyCard>
     );
   }
-
-  const whyCare = buildWhyCare(topic);
-  const relatedMatches = topic.relatedMatches?.length ? topic.relatedMatches : ["暂无强关联赛事，可作为泛体育热点观察"];
-  const contentAngles = topic.contentAngles?.length ? topic.contentAngles : ["先核实来源，再判断是否适合转化为赛事复盘、平台话题或短视频钩子。"];
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6 pb-16">
@@ -92,15 +137,21 @@ export default function HotTopicDetailPage() {
       <section className="overflow-hidden rounded-[36px] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-7 shadow-[0_24px_80px_rgba(15,23,42,0.08)] lg:p-9">
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div className="max-w-3xl">
-            <div className="text-xs font-black tracking-[0.22em] text-emerald-700">热点分析与生产</div>
+            <div className="text-xs font-black tracking-[0.22em] text-emerald-700">热点概览</div>
             <h1 className="mt-4 text-3xl font-black leading-tight text-slate-950 lg:text-5xl">{topic.title}</h1>
-            <p className="mt-4 text-base leading-8 text-slate-600">{topic.summary || "该热点暂无摘要，建议结合来源链接人工确认背景后再生产内容。"}</p>
+            <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">{buildTopicIntro(topic)}</p>
+            <div className="mt-6 flex flex-wrap gap-2">
+              {topic.category ? <Badge>{topic.category}</Badge> : null}
+              {topic.leverageValue ? <Badge strong={topic.valueLevel === "high"}>{topic.leverageValue}</Badge> : null}
+              {typeof topic.valueScore === "number" ? <Badge>{`价值分 ${topic.valueScore}`}</Badge> : null}
+              {(topic.tags ?? []).slice(0, 6).map((tag) => <Badge key={tag}>{tag}</Badge>)}
+            </div>
           </div>
-          <div className="min-w-[240px] rounded-[28px] border border-white/80 bg-white/85 p-5 shadow-lg shadow-slate-900/5">
+          <div className="min-w-[260px] rounded-[28px] border border-white/80 bg-white/85 p-5 shadow-lg shadow-slate-900/5">
             <div className="grid grid-cols-2 gap-3 text-sm">
               <MetaItem label="来源" value={topic.source} />
               <MetaItem label="平台" value={topic.platform ?? "全网"} />
-              <MetaItem label="热度" value={String(topic.heat ?? topic.relevanceScore ?? "-")} />
+              <MetaItem label="热度" value={String(topic.heat ?? "-")} />
               <MetaItem label="价值" value={topic.leverageValue ?? "待判断"} />
             </div>
             {topic.url ? (
@@ -111,76 +162,106 @@ export default function HotTopicDetailPage() {
             ) : null}
           </div>
         </div>
-        <div className="mt-6 flex flex-wrap gap-2">
-          {topic.category ? <Badge>{topic.category}</Badge> : null}
-          {(topic.tags ?? []).map((tag) => <Badge key={tag}>{tag}</Badge>)}
-        </div>
       </section>
 
-      <section className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-        <Panel title="热点分析">
-          <DetailBlock title="为什么值得关注" items={whyCare} />
-          <DetailBlock title="与世界杯/体育内容的关联方式" items={[
-            topic.category === "世界杯" || topic.category === "体育"
-              ? "它和赛事语境直接相关，可以作为选题判断的主素材。"
-              : "它属于泛热点，需要先找到和球队、球员、赛事情绪或传播场景的连接点。",
-            "建议把热点当作内容入口，正文仍回到比赛事实、数据或公开来源。"
-          ]} />
-          <DetailBlock title="可借势内容方向" items={contentAngles} />
-        </Panel>
-
-        <Panel title="生产入口">
-          <DetailBlock title="推荐关联赛事" items={relatedMatches} />
-          <DetailBlock title="适合平台" items={["微博：承接即时讨论", "B站：做事件复盘和观点解释", "小红书：做新手看球卡片", "短视频：用前三秒热点钩子切入"]} />
-          <button
-            type="button"
-            onClick={() => setShowPackage(true)}
-            className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition hover:-translate-y-0.5"
-          >
-            <Sparkles className="h-4 w-4" />
-            生成热点内容方案
-          </button>
-          {cacheMeta.message ? <p className="mt-3 text-xs leading-5 text-slate-500">{cacheMeta.message}</p> : null}
-        </Panel>
-      </section>
-
-      {packageData ? (
-        <section className="rounded-[34px] border border-emerald-100 bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.06)]">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <div className="text-xs font-black tracking-[0.18em] text-emerald-700">内容方案包</div>
-              <h2 className="mt-2 text-3xl font-black text-slate-950">热点选题与平台生产包</h2>
-            </div>
-            <button
-              type="button"
-              onClick={() => copyText(Object.entries(packageData).map(([key, lines]) => `## ${packageLabel(key)}\n${lines.map((line) => `- ${line}`).join("\n")}`).join("\n\n"), "all")}
-              className="inline-flex h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5"
-            >
-              <Clipboard className="h-4 w-4" />
-              {copied === "all" ? "已复制" : "复制全部"}
-            </button>
-          </div>
-          <div className="mt-5 grid gap-4 lg:grid-cols-2">
-            {Object.entries(packageData).map(([key, lines]) => (
-              <div key={key} className="rounded-[26px] border border-slate-200 bg-slate-50 p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-base font-black text-slate-950">{packageLabel(key)}</div>
-                  <button
-                    type="button"
-                    onClick={() => copyText(lines.join("\n"), key)}
-                    className="text-xs font-semibold text-emerald-700"
-                  >
-                    {copied === key ? "已复制" : "复制"}
-                  </button>
-                </div>
-                <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
-                  {lines.map((line) => <li key={line}>· {line}</li>)}
-                </ul>
-              </div>
-            ))}
-          </div>
+      {analysis ? (
+        <section className="grid gap-5 lg:grid-cols-2">
+          <Panel title="热点分析">
+            <DetailBlock title="为什么值得关注" items={analysis.whyCare} />
+            <DetailBlock title="与世界杯/足球内容的关系" items={analysis.relation} />
+            <DetailBlock title="可切入的内容角度" items={analysis.angles} />
+          </Panel>
+          <Panel title="生产判断">
+            <DetailBlock title="适合平台" items={analysis.platforms} />
+            <DetailBlock title="需要核验的信息" items={analysis.factsToVerify} />
+            <DetailBlock title="潜在风险" items={analysis.risks} />
+          </Panel>
         </section>
       ) : null}
+
+      <section className="rounded-[34px] border border-emerald-100 bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.06)]">
+        <div className="text-xs font-black tracking-[0.18em] text-emerald-700">选择生产目标</div>
+        <h2 className="mt-2 text-3xl font-black text-slate-950">内容生成配置</h2>
+        <div className="mt-5 grid gap-4 lg:grid-cols-3">
+          <SelectField label="平台" value={config.platform} options={platforms} onChange={(value) => updateConfig("platform", value as HotGenerationConfig["platform"])} />
+          <SelectField label="内容类型" value={config.contentType} options={contentTypes} onChange={(value) => updateConfig("contentType", value as HotGenerationConfig["contentType"])} />
+          <SelectField label="语气" value={config.tone} options={tones} onChange={(value) => updateConfig("tone", value as HotGenerationConfig["tone"])} />
+          <SelectField label="长度" value={config.length} options={lengths} onChange={(value) => updateConfig("length", value as HotGenerationConfig["length"])} />
+          <ToggleField label="引用比赛事实" checked={config.useMatchFacts} onChange={(value) => updateConfig("useMatchFacts", value)} />
+          <ToggleField label="加入风险提醒" checked={config.includeRiskReminder} onChange={(value) => updateConfig("includeRiskReminder", value)} />
+        </div>
+        <button
+          type="button"
+          onClick={generateDraft}
+          className="mt-5 inline-flex h-12 items-center justify-center gap-2 rounded-full bg-emerald-600 px-6 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition hover:-translate-y-0.5"
+        >
+          <Sparkles className="h-4 w-4" />
+          生成内容
+        </button>
+      </section>
+
+      <section className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
+        <Panel title="生成结果编辑区">
+          <textarea
+            value={draft}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              setAudit(null);
+            }}
+            placeholder="点击“生成内容”后，结果会出现在这里。你也可以直接粘贴或手动编辑文案，再一键审核。"
+            className="mt-5 min-h-[320px] w-full rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-700 outline-none transition focus:border-emerald-300 focus:bg-white"
+          />
+          <div className="mt-4 flex flex-wrap gap-3">
+            <ActionButton onClick={() => draft && copyText(draft, "draft")} icon={<Clipboard className="h-4 w-4" />}>{copied === "draft" ? "已复制" : "复制"}</ActionButton>
+            <ActionButton onClick={generateDraft} icon={<Sparkles className="h-4 w-4" />}>重新生成</ActionButton>
+            <ActionButton onClick={saveDraft} icon={<Save className="h-4 w-4" />}>{saved ? "已保存" : "保存草稿"}</ActionButton>
+            <ActionButton onClick={reviewDraft} icon={<ShieldCheck className="h-4 w-4" />} primary>一键审核</ActionButton>
+          </div>
+        </Panel>
+
+        <Panel title="审核结果">
+          {audit ? (
+            <div className="mt-5 space-y-5">
+              <div className={`inline-flex rounded-full px-4 py-2 text-sm font-black ${audit.level === "pass" ? "bg-emerald-50 text-emerald-700" : audit.level === "revise" ? "bg-amber-50 text-amber-700" : "bg-rose-50 text-rose-700"}`}>
+                {audit.level === "pass" ? "可发布" : audit.level === "revise" ? "建议修改" : "不建议发布"}
+              </div>
+              <DetailBlock title="真实性审核" items={audit.authenticity} />
+              <DetailBlock title="风险审核" items={audit.risk} />
+              <DetailBlock title="传播伦理审核" items={audit.ethics} />
+              <DetailBlock title="平台适配审核" items={audit.platformFit} />
+              <DetailBlock title="修改建议" items={audit.suggestions} />
+              <div className="rounded-[22px] border border-emerald-100 bg-emerald-50 p-4">
+                <div className="text-xs font-black tracking-[0.14em] text-emerald-700">可应用改写</div>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">{audit.rewriteSuggestion}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDraft(audit.rewriteSuggestion);
+                    setAudit(null);
+                  }}
+                  className="mt-3 inline-flex h-10 items-center gap-2 rounded-full bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:-translate-y-0.5"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  应用建议
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-5 rounded-[22px] border border-dashed border-slate-200 bg-slate-50 p-6 text-sm leading-7 text-slate-500">
+              生成或编辑内容后，点击“一键审核”。系统会检查真实性、表达风险、传播伦理和平台适配，并给出可回填的改写建议。
+            </p>
+          )}
+          {cacheMeta.message ? <p className="mt-4 text-xs leading-5 text-slate-500">{cacheMeta.message}</p> : null}
+        </Panel>
+      </section>
+    </div>
+  );
+}
+
+function EmptyCard({ children }: { children: ReactNode }) {
+  return (
+    <div className="mx-auto max-w-5xl rounded-[32px] border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
+      {children}
     </div>
   );
 }
@@ -206,6 +287,43 @@ function DetailBlock({ title, items }: { title: string; items: string[] }) {
   );
 }
 
+function SelectField({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
+  return (
+    <label className="block">
+      <span className="text-xs font-black tracking-[0.12em] text-slate-400">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-emerald-300 focus:bg-white"
+      >
+        {options.map((option) => <option key={option}>{option}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function ToggleField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
+  return (
+    <label className="flex h-full min-h-12 items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4">
+      <span className="text-sm font-semibold text-slate-700">{label}</span>
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 accent-emerald-600" />
+    </label>
+  );
+}
+
+function ActionButton({ children, icon, primary, onClick }: { children: ReactNode; icon: ReactNode; primary?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-semibold transition hover:-translate-y-0.5 ${primary ? "bg-emerald-600 text-white shadow-lg shadow-emerald-100" : "border border-slate-200 bg-white text-slate-700"}`}
+    >
+      {icon}
+      {children}
+    </button>
+  );
+}
+
 function MetaItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-slate-50 p-3">
@@ -215,9 +333,9 @@ function MetaItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Badge({ children }: { children: string | number }) {
+function Badge({ children, strong }: { children: string | number; strong?: boolean }) {
   return (
-    <span className="rounded-full bg-white/85 px-3 py-1.5 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-100">
+    <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${strong ? "bg-amber-50 text-amber-700 ring-amber-200" : "bg-white/85 text-emerald-800 ring-emerald-100"}`}>
       {children}
     </span>
   );

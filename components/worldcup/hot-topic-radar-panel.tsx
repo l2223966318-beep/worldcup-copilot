@@ -11,9 +11,9 @@ import type { WorldCupMatch } from "@/lib/sports/types";
 import type { SportTheme } from "@/lib/sport-theme";
 import { formatBeijingDateTime } from "@/lib/time/beijingTime";
 
-type HotTab = "全部" | "微博" | "B站" | "抖音" | "知乎" | "百度" | "头条";
+type HotTab = "全部" | "微博" | "B站" | "抖音" | "小红书" | "知乎" | "百度" | "头条";
 
-const tabs: HotTab[] = ["全部", "微博", "B站", "抖音", "知乎", "百度", "头条"];
+const tabs: HotTab[] = ["全部", "微博", "B站", "抖音", "小红书", "知乎", "百度", "头条"];
 
 export function HotTopicRadarPanel({
   theme,
@@ -121,10 +121,10 @@ export function HotTopicRadarPanel({
 
         <div className="mt-4 rounded-2xl p-4 text-xs leading-6" style={{ backgroundColor: theme.background, color: theme.mutedText }}>
           <div className="font-semibold text-slate-800">数据源状态</div>
-          <div>热点 API：UApiPro 每日热榜 / 热点信息</div>
+          <div>热点 API：UApiPro 每日热榜 / 小红书配置源 / 小红书公开搜索</div>
           <div>来源定位：赛事热点补充数据源</div>
           <div>智能筛选：分类、标签和借势价值加工层</div>
-          <div>排序逻辑：按全网热度优先，不随左侧比赛切换。</div>
+          <div>排序逻辑：按价值分优先，不随左侧比赛切换。</div>
           <div className="mt-2 font-semibold">
             状态：{sourceStatusLabel(sourceStatus)}
             {lastUpdatedAt ? ` · 更新时间：${formatHotTime(lastUpdatedAt)}` : " · 暂无缓存"}
@@ -192,6 +192,7 @@ export function HotTopicRadarPanel({
                       <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{topic.summary || "等待补充摘要。"}</p>
                       <div className="mt-2 text-xs font-semibold" style={{ color: theme.secondary }}>
                         热度：{topic.heat ?? topic.relevanceScore ?? "-"}
+                        {typeof topic.valueScore === "number" ? `｜价值分：${topic.valueScore}` : ""}
                       </div>
                       {topic.updatedAt ? <div className="mt-1 text-[11px] font-semibold text-slate-400">发布时间：{formatHotTime(topic.updatedAt)}</div> : null}
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -273,12 +274,15 @@ function normalizeHotTopics(items: HotItem[], matches: WorldCupMatch[], updatedA
       heat: item.heat ?? item.hot,
       platform: item.platform,
       source,
-      category: classifyCategory(text),
+      category: item.category ?? classifyCategory(text),
+      valueLevel: item.valueLevel,
+      valueScore: item.valueScore,
       relevanceScore: item.relevance,
-      leverageValue: classifyLeverage(text, item.relevance),
+      leverageValue: classifyLeverage(item.valueLevel, item.valueScore, text, item.relevance),
       tags: Array.from(new Set([...(item.tags ?? []), ...buildTags(text)])),
       updatedAt: item.publishedAt ?? item.time ?? updatedAt,
       url: item.url,
+      raw: item.raw,
       contentAngles: buildContentAngles(item.title, text),
       relatedMatches: findRelatedMatches({ title: item.title, summary: item.summary, tags: item.tags }, matches)
     };
@@ -290,12 +294,13 @@ function normalizeHotTopics(items: HotItem[], matches: WorldCupMatch[], updatedA
   }
 
   return Array.from(seen.values()).sort(
-    (a, b) => getTopicHeatScore(b) - getTopicHeatScore(a) || (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0) || (a.rank ?? 999) - (b.rank ?? 999)
+    (a, b) => (b.valueScore ?? 0) - (a.valueScore ?? 0) || getTopicHeatScore(b) - getTopicHeatScore(a) || (a.rank ?? 999) - (b.rank ?? 999)
   );
 }
 
 function normalizeSource(source: string): HotTopic["source"] {
-  if (/今日热榜|榜眼数据/i.test(source)) return "今日热榜";
+  if (/小红书公开搜索|小红书配置源/i.test(source)) return source;
+  if (/微博|抖音|B站|哔哩|知乎|百度|头条|今日热榜|榜眼数据/i.test(source)) return "今日热榜";
   if (/tavily|全网搜索/i.test(source)) return "全网搜索";
   if (/fallback|ai|AI筛选|演示数据/i.test(source)) return "AI筛选";
   return "今日热榜";
@@ -310,10 +315,11 @@ function classifyCategory(text: string): HotTopic["category"] {
   return "泛热点";
 }
 
-function classifyLeverage(text: string, score?: number): HotTopic["leverageValue"] {
-  if (/世界杯|足球|体育|进球|乌龙|球衣|VAR|裁判|伤退|球队|球员/i.test(text) || (score ?? 0) >= 82) return "高价值";
-  if ((score ?? 0) >= 55) return "可尝试";
-  return "低相关";
+function classifyLeverage(level?: HotTopic["valueLevel"], valueScore?: number, text?: string, score?: number): HotTopic["leverageValue"] {
+  if (level === "high" || (valueScore ?? 0) >= 75) return "高价值";
+  if (level === "medium" || (valueScore ?? 0) >= 50) return "可观察";
+  if (!level && (/世界杯|足球|体育|进球|乌龙|球衣|VAR|裁判|伤退|球队|球员/i.test(text ?? "") || (score ?? 0) >= 75)) return "可观察";
+  return "低优先级";
 }
 
 function buildTags(text: string) {
@@ -369,6 +375,7 @@ function filterByTab(topic: HotTopic, tab: HotTab) {
     微博: ["微博", "weibo"],
     B站: ["b站", "bilibili", "哔哩"],
     抖音: ["抖音", "douyin"],
+    小红书: ["小红书", "xiaohongshu", "xhs"],
     知乎: ["知乎", "zhihu"],
     百度: ["百度", "baidu"],
     头条: ["头条", "toutiao"]
@@ -398,6 +405,7 @@ function sourceStatusLabel(status: HotSearchPayload["sourceStatus"]) {
 
 function sourcePriority(source: HotTopic["source"]) {
   if (source === "今日热榜") return 3;
+  if (/小红书/.test(source)) return 2;
   if (source === "全网搜索") return 2;
   return 1;
 }
