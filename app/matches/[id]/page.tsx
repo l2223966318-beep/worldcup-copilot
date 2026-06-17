@@ -1188,6 +1188,7 @@ function sourceLabel(status: SourceStatus) {
 
 function sourceProviderTag(provider: WorldCupMatch["source"]["provider"]) {
   const labels: Record<WorldCupMatch["source"]["provider"], string> = {
+    sportmonks: "Sportmonks 数据",
     "api-football": "真实 API 数据",
     "worldcup26-free": "WorldCup26 免费 API",
     "thestatsapi-fixtures": "TheStatsAPI 免费赛程",

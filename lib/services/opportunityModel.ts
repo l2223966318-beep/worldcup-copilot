@@ -92,7 +92,7 @@ export function buildMatchOpportunityModel(
   if (!richData && eventCount === 0 && match.status !== "scheduled") risk += 14;
   if (/(var|controvers|争议|红牌|penalty)/i.test(eventText)) risk += 18;
   if (match.status === "live") risk += 10;
-  if (match.source.provider !== "api-football") risk += 8;
+  if (!["sportmonks", "api-football"].includes(match.source.provider)) risk += 8;
 
   let productionCost = 52;
   productionCost -= richData ? 16 : 0;
@@ -102,6 +102,7 @@ export function buildMatchOpportunityModel(
   productionCost -= hasBigStage(match.round, match.group) ? 4 : 0;
 
   let sourceConfidence = 40;
+  if (match.source.provider === "sportmonks") sourceConfidence += 38;
   if (match.source.provider === "api-football") sourceConfidence += 35;
   if (scoreKnown) sourceConfidence += 12;
   if (richData) sourceConfidence += 8;
