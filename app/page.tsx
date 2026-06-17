@@ -212,7 +212,7 @@ export default function DashboardPage() {
             <div className="mt-6 grid gap-5">
               {filteredMatches.length ? (
                 filteredMatches.map((item) => (
-                  <OpportunityMatchCard key={item.id} match={item} theme={theme} sourceStatus={payload?.sourceStatus ?? "fallback"} />
+                  <OpportunityMatchCard key={item.id} match={item} theme={theme} sourceStatus={activeStatus} />
                 ))
               ) : isNoDataState ? (
                 <div className="rounded-[30px] border border-dashed border-slate-300 bg-white p-10">
@@ -428,7 +428,7 @@ function OpportunityMatchCard({
   const priority = opportunity.grade;
   const homeTeam = localizeTeamName(match.homeTeam.name);
   const awayTeam = localizeTeamName(match.awayTeam.name);
-  const round = localizeRoundName(match.round || "?????");
+  const round = localizeRoundName(match.round || "世界杯赛程");
   const statusText = localizeMatchStatus(match.statusText);
 
   return (
@@ -440,8 +440,8 @@ function OpportunityMatchCard({
         <div className="flex h-16 w-16 items-center justify-center rounded-3xl text-3xl font-black text-white" style={{ backgroundColor: priorityColor(priority, theme) }}>
           {priority}
         </div>
-        <div className="text-sm font-semibold text-slate-500 lg:mt-2">????</div>
-        <div className="mt-1 text-xs font-semibold text-slate-400 lg:mt-1">??? {opportunity.valueScore}</div>
+        <div className="text-sm font-semibold text-slate-500 lg:mt-2">机会等级</div>
+        <div className="mt-1 text-xs font-semibold text-slate-400 lg:mt-1">价值分 {opportunity.valueScore}</div>
         <div className="mt-2 flex flex-wrap gap-1.5 lg:mt-3">
           {opportunity.signals.slice(0, 3).map((signal) => (
             <span key={signal} className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
@@ -453,19 +453,19 @@ function OpportunityMatchCard({
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-            ???? {formatKickoffTime(match.kickoffTime)}
+            北京时间 {formatKickoffTime(match.kickoffTime)}
           </span>
           <h3 className="text-3xl font-semibold tracking-tight text-slate-950">
             {homeTeam} <span style={{ color: theme.primary }}>{match.score.display}</span> {awayTeam}
           </h3>
           <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{statusText}</span>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{round}</span>
-          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">???{opportunity.riskLevel}</span>
-          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">???{sourceLabel(sourceStatus)}</span>
+          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">风险：{opportunity.riskLevel}</span>
+          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">数据：{sourceLabel(sourceStatus)}</span>
         </div>
-        <p className="mt-3 text-sm leading-6 text-slate-600">?????{opportunity.recommendationReason}</p>
+        <p className="mt-3 text-sm leading-6 text-slate-600">推荐内容主线：{opportunity.recommendationReason}</p>
         <div className="mt-4 flex flex-wrap gap-2">
-          {["B?", "??", "????", "????", match.venue.city ?? match.venue.name ?? "???"].map((direction) => (
+          {["B站", "微博", "赛后复盘", "数据解读", localizeVenue(match.venue.city ?? match.venue.name)].map((direction) => (
             <span key={direction} className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
               {direction}
             </span>
@@ -484,12 +484,23 @@ function OpportunityMatchCard({
           className="inline-flex h-12 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold text-white transition hover:-translate-y-0.5"
           style={{ backgroundColor: theme.primary, boxShadow: `0 18px 38px ${theme.heroGlow}` }}
         >
-          ????
+          进入分析
           <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
     </article>
   );
+}
+
+function localizeVenue(value?: string) {
+  if (!value) return "场馆待确认";
+  return value
+    .replace(/Houston, TX, USA/i, "休斯敦，美国")
+    .replace(/United States/i, "美国")
+    .replace(/USA/i, "美国")
+    .replace(/New York\/New Jersey \(East Rutherford\)/i, "纽约/新泽西")
+    .replace(/Miami \(Miami Gardens\)/i, "迈阿密")
+    .replace(/Houston Stadium/i, "休斯敦体育场");
 }
 
 function SourceBadge({ status, lastUpdated, loading, error }: { status: SourceStatus; lastUpdated?: string; loading?: boolean; error?: string }) {
