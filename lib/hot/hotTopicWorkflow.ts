@@ -229,7 +229,7 @@ export function auditHotDraft(text: string, topic: HotTopic, platform: HotGenera
     suggestions: [] as string[]
   };
 
-  if (/(确认|实锤|官方证实|已经证明|必然|肯定)/.test(text)) {
+  if (/(实锤|官方证实|已经证明|必然|肯定|确认伤退|确认报销|确认缺席)/.test(text)) {
     findings.authenticity.push("存在确定性表述。若来源只是热榜或公开搜索，建议改成“引发讨论”“有待核验”。");
   }
   if (/\d{1,2}[:比-]\d{1,2}/.test(text) && !/\b来源|数据|据/.test(text)) {
@@ -256,7 +256,7 @@ export function auditHotDraft(text: string, topic: HotTopic, platform: HotGenera
   findings.suggestions.push("补充来源链接或注明“需人工核验”。");
   findings.suggestions.push("避免制造球员、球队、国家之间的对立。");
 
-  const severe = findings.risk.some((item) => /不建议|高风险|攻击|歧视|网暴/.test(item));
+  const severe = findings.risk.some((item) => !item.includes("未发现") && /不建议|高风险|攻击|歧视|网暴/.test(item));
   const needsRevision = severe || findings.authenticity.some((item) => /确定性|比分/.test(item));
   const rewriteSuggestion = rewriteSafer(text, topic);
 

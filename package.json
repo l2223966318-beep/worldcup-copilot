@@ -9,6 +9,7 @@
     "lint": "next lint",
     "test:signals": "node scripts/test-signals.mjs",
     "test:hot": "node scripts/test-hot-search.mjs",
+    "test:hot-topic": "node scripts/test-hot-topic-workflow.mjs",
     "test:workflow": "node scripts/test-workflow-services.mjs",
     "test:match-search": "node scripts/test-match-search.mjs",
     "test:match-detail": "node scripts/test-match-detail-presentation.mjs",
