@@ -1,5 +1,5 @@
 import type { MatchData } from "@/data/matches";
-import { diversifyPlatformText, qualityControl } from "@/lib/ai/quality";
+import { cleanList, cleanTitle, diversifyPlatformText, ensurePublishable, qualityControl } from "@/lib/ai/quality";
 import type { TopicIdea } from "@/lib/ai/topics";
 
 export type PlatformContent = {
@@ -62,103 +62,111 @@ export type PlatformContent = {
 export function generatePlatformContent(match: MatchData, topic: TopicIdea): PlatformContent {
   const leadPlayer = match.keyPlayers[0];
   const opponentPlayer = match.keyPlayers[1] ?? leadPlayer;
-  const statLine = `${match.teamA}控球率 ${match.stats.teamA.possession}%，射门 ${match.stats.teamA.shots} 次，射正 ${match.stats.teamA.shotsOnTarget} 次；${match.teamB}控球率 ${match.stats.teamB.possession}%，射门 ${match.stats.teamB.shots} 次，射正 ${match.stats.teamB.shotsOnTarget} 次`;
-  const scoreHook = match.score === "vs" ? "赛程信息" : `${match.score} 的比分`;
-  const eventFocus = match.keyEvents.length > 1 ? "关键事件时间线" : "基础数据";
-  const evidenceLine = "控球、射门和射正";
+  const scoreText = match.score === "vs" ? "这场球" : `${match.score}这场球`;
+  const eventLine = match.keyEvents[0]?.description || `${match.teamA}和${match.teamB}的比赛走势`;
+  const dataLine = `${match.teamA}射门${match.stats.teamA.shots}次、射正${match.stats.teamA.shotsOnTarget}次，${match.teamB}射门${match.stats.teamB.shots}次、射正${match.stats.teamB.shotsOnTarget}次`;
+  const mainAngle = ensurePublishable(topic.coreAngle || topic.title);
+  const sourceCaution = "涉及伤病、判罚、冲突和更衣室信息，只能写公开事实，发布前核验来源。";
+
+  const bilibiliTitles = cleanList([
+    `${leadPlayer.name}这场，真有复盘价值`,
+    `${scoreText}别只看比分`,
+    `${match.teamA}赢得没那么简单`,
+    `${match.teamB}追到这一步不容易`,
+    `${topic.title}`
+  ], "bilibili", { title: true, max: 5 });
+
+  const xhsTitles = cleanList([
+    `看懂${match.teamA}这场球`,
+    `${scoreText}最值得看这3点`,
+    `${leadPlayer.name}这场为什么关键`,
+    `不懂球也能看懂这场`,
+    `${topic.title}`
+  ], "xiaohongshu", { title: true, max: 5 });
 
   const raw: PlatformContent = {
     bilibili: {
-      titles: [
-        `${topic.title}：这场${match.stage}真正该怎么看？`,
-        `${match.score} 背后，${topic.coreAngle}`,
-        `深度复盘${match.teamA} vs ${match.teamB}：别只看比分`,
-        topic.sampleTitles[0],
-        `用数据、时间线和镜头拆开${match.name}`
-      ],
-      recommendedSection: "足球 / 运动综合 / 体育赛事复盘",
-      recommendedDuration: topic.recommendation === "主推" ? "8-12 分钟" : "4-6 分钟",
-      openingScript: `前 30 秒先抛出问题：${topic.sampleTitles[0]}。随后用 ${match.score}${match.penaltyScore ? `，点球 ${match.penaltyScore}` : ""} 建立冲突，再给出本期判断：本期从“${topic.coreAngle}”切入，解释这场比赛为什么值得被复盘。`,
+      titles: bilibiliTitles,
+      recommendedSection: "足球 / 运动综合 / 赛事复盘",
+      recommendedDuration: topic.recommendation === "主推" ? "8-10分钟" : "4-6分钟",
+      openingScript: ensurePublishable(`别急着下结论。${eventLine}，才是这场球最值得拆开的地方。今天就从${topic.title}讲起。`, "bilibili"),
       outline: [
-        "00:00 用比分和关键镜头建立问题",
-        "00:45 比赛阶段与双方基础阵型",
-        `02:00 ${evidenceLine} 之间的矛盾`,
-        `04:00 ${leadPlayer.name} 与 ${opponentPlayer.name} 的人物叙事`,
-        "06:30 时间线复盘三个转折点",
-        "08:00 发布风险提醒与评论区问题"
+        `00:00 先抛结论：${cleanTitle(topic.title, "bilibili")}`,
+        `00:40 比分和关键事件`,
+        `02:00 数据证据：${dataLine}`,
+        `04:00 人物线：${leadPlayer.name}和${opponentPlayer.name}`,
+        "结尾：给评论区一个安全讨论题"
       ],
-      coverKeywords: [topic.title, match.score, "机会质量", match.stage],
-      coverCopy: `${topic.title}\n${match.score} 之外的真正胜负手`,
-      danmakuPoints: [`${match.teamA}这组数据怎么理解`, `${match.teamB}是否踢出了预期`, "控球不等于控制", "这里需要补充来源"],
-      commentPrompt: `弹幕互动：你认为这场比赛最关键的是 ${leadPlayer.name} 的表现、${eventFocus}，还是机会质量？`,
-      pinnedComment: "置顶评论：如果只用一句话复盘这场比赛，你会选人物、战术还是数据？欢迎按时间点补充你的判断。",
-      creatorType: "战术复盘型、数据解说型、人物叙事型、体育纪录片剪辑型 UP 主。",
-      unsuitableCreatorType: "只做情绪剪辑、缺少赛事事实核查、习惯使用攻击性标题的账号。"
+      coverKeywords: cleanList([match.score, leadPlayer.name, topic.category, "复盘", "关键瞬间"], "generic", { max: 5 }),
+      coverCopy: cleanTitle(`${scoreText}真正值得看的地方`, "bilibili"),
+      danmakuPoints: cleanList([
+        "这球算不算转折点？",
+        `${leadPlayer.name}是不是本场关键人？`,
+        "控球多就一定占优吗？",
+        "你会从人物还是数据切入？"
+      ], "generic", { max: 4 }),
+      commentPrompt: ensurePublishable(`你觉得这场最该聊${leadPlayer.name}，还是聊${topic.category}？`, "bilibili"),
+      pinnedComment: ensurePublishable(`一句话复盘这场球，你会选比分、人物，还是关键事件？`, "bilibili"),
+      creatorType: "适合战术复盘、人物叙事、数据解读型账号。",
+      unsuitableCreatorType: "不适合只做情绪剪辑、缺少事实核验的标题党账号。"
     },
     xiaohongshu: {
-      titles: [
-        `不懂球也能看懂：${topic.title}`,
-        `${match.name}最值得收藏的 5 个看点`,
-        `一页讲清 ${match.score} 背后的故事`,
-        `世界杯内容灵感：${topic.title}`,
-        `赛后图文怎么做？先从这个角度切入`
-      ],
-      firstImageCopy: `${match.score} 之后，真正值得讲的是：${topic.title}`,
+      titles: xhsTitles,
+      firstImageCopy: cleanTitle(`${scoreText}为什么值得收藏`, "xiaohongshu"),
       cards: [
-        { title: "这场比赛先看什么", body: `${match.name}，${scoreHook}${match.penaltyScore ? `，点球 ${match.penaltyScore}` : ""}。先抓住比分、数据差异和关键事件三条线。` },
-        { title: "主推选题", body: `${topic.title}。核心不是堆情绪，而是把比赛事实、数据和平台表达放在同一条叙事线上。` },
-        { title: "数据怎么说", body: `${statLine}。建议用“控球不等于控制比赛”或“机会质量高于场面观感”来解释。` },
-        { title: "为什么值得收藏", body: "这套结构可以复用到其他比赛：比分、关键事件、人物主线、数据异常、发布风险五个模块。" },
-        { title: "发布提醒", body: "涉及裁判、伤病、争议时，用“需核实”“建议补充来源”“从公开信息看”替代绝对判断。" }
+        { title: "先看结论", body: ensurePublishable(`${topic.title}。这条主线最容易让非核心球迷看懂。`, "xiaohongshu") },
+        { title: "关键瞬间", body: ensurePublishable(eventLine, "xiaohongshu") },
+        { title: "数据怎么读", body: ensurePublishable(dataLine, "xiaohongshu") },
+        { title: "人物线", body: ensurePublishable(`${leadPlayer.name}和${opponentPlayer.name}可以做成一组对照。`, "xiaohongshu") },
+        { title: "发布提醒", body: ensurePublishable(sourceCaution, "xiaohongshu") }
       ],
-      cardTitles: ["比分不是全部", "主推选题", "关键数据", "收藏模板", "发布提醒"],
-      coverTitle: `${match.score} 之后，怎么讲好这场球？`,
-      collectReason: "这是一套可复用的赛后内容拆解模板，适合运营、编辑和创作者收藏。",
-      tags: ["世界杯", "足球复盘", "体育内容", "内容运营", match.teamA, match.teamB],
-      avoidWords: ["黑哨", "黑幕", "废了", "确认伤退", "全网都在骂"]
+      cardTitles: ["先看结论", "关键瞬间", "数据怎么读", "人物线", "发布提醒"],
+      coverTitle: cleanTitle(`${scoreText}看这3个瞬间`, "xiaohongshu"),
+      collectReason: ensurePublishable("这套结构能直接复用：结论、瞬间、数据、人物、风险。", "xiaohongshu"),
+      tags: cleanList(["世界杯", "足球复盘", "看懂比赛", match.teamA, match.teamB], "generic", { max: 5 }),
+      avoidWords: ["黑幕", "保送", "全网都在骂", "确认伤退", "彻底废了"]
     },
     weibo: {
-      fiveMinuteComment: `${match.name}踢成 ${match.score}。先不急着下结论，最值得看的线索是：${topic.coreAngle}`,
-      thirtyMinuteDiscussion: `赛后 30 分钟讨论题：这场比赛更应该从人物叙事、战术变化，还是数据异常切入？我的判断是先推“${topic.title}”，再用图表补证据。`,
-      controversySafeVersion: "涉及判罚和争议时，建议写成“这一判罚引发讨论，仍需结合规则条文和权威解读”。避免直接定性。",
-      shortComment: `${match.name}踢成 ${match.score}，最值得快速切入的是：${topic.coreAngle}。赛后快评建议先讲事实，再讲观点。`,
-      longPost: `【${topic.title}】\n${match.summary}\n\n从数据看，${statLine}。这说明赛后讨论不能只看控球时间，还要看机会质量、关键事件和球员执行。\n\n建议把这场比赛拆成三层：第一层讲赛果和时间线，第二层讲${leadPlayer.name}与${opponentPlayer.name}的人物对照，第三层讲数据与风险边界。`,
-      debateQuestion: `你认为${match.name}最值得复盘的角度是人物叙事、战术变化，还是数据差异？`,
-      hashtags: ["#世界杯#", `#${match.teamA}vs${match.teamB}#`, "#足球复盘#", "#体育内容运营#"],
-      riskTip: "微博讨论容易放大争议，涉及判罚、伤病和攻击性评价时，避免高风险定性词。"
+      fiveMinuteComment: ensurePublishable(`${match.name} ${match.score}。这场后劲最大的点，是${topic.title}。`, "weibo"),
+      thirtyMinuteDiscussion: ensurePublishable(`如果只选一个切口聊这场，你会选人物、数据，还是最后的关键瞬间？`, "weibo"),
+      controversySafeVersion: ensurePublishable("涉及判罚、伤病和冲突时，用“引发讨论”“仍需核验”，不要写绝对结论。", "weibo"),
+      shortComment: ensurePublishable(`${scoreText}后劲不小。${mainAngle}`, "weibo"),
+      longPost: ensurePublishable(`${cleanTitle(topic.title, "weibo")}\n\n${match.summary}\n\n从数据看，${dataLine}。这条内容适合先讲事实，再给观点，最后留一个讨论问题。`, "weibo"),
+      debateQuestion: ensurePublishable(`这场球最值得复盘的是${leadPlayer.name}，还是${topic.category}？`, "weibo"),
+      hashtags: cleanList([`#${match.teamA}vs${match.teamB}#`, "#世界杯#", "#足球复盘#"], "generic", { max: 3 }),
+      riskTip: ensurePublishable(sourceCaution, "weibo")
     },
     shortVideo: {
-      threeSecondHook: `${scoreHook}不是全部，真正的内容价值在数据和关键事件里。`,
-      fifteenSec: `开头 2 秒：${match.score} 不是全部。中段 8 秒：抛出“${topic.title}”。结尾 5 秒：用一个关键数据或镜头落到评论区问题。`,
-      thirtySec: `0-5 秒：比分定格和冲突问题；5-12 秒：讲${leadPlayer.name}或关键事件；12-22 秒：用射门和射正解释比赛；22-30 秒：提示风险边界并引导评论。`,
-      sixtySec: `用事件时间线串起比赛：开场建立双方状态，中段讲${topic.coreAngle}，后段用数据图表解释走势，最后落到“这条内容适合哪个平台发”。`,
+      threeSecondHook: cleanTitle(`${scoreText}别只看比分`, "douyin"),
+      fifteenSec: ensurePublishable(`先给结论：${topic.title}。再用一个关键事件和一组数据，把这场球讲清楚。`, "douyin"),
+      thirtySec: ensurePublishable(`开头给比分，中段讲${eventLine}，最后用${dataLine}落到评论区问题。`, "douyin"),
+      sixtySec: ensurePublishable(`这条视频分四步：比分定格、关键事件、人物线、风险提醒。重点不是煽情，而是把${topic.title}讲顺。`, "douyin"),
       storyboard: [
-        `比分定格画面，字幕：${scoreHook}不是全部`,
-        "关键球员近景，标注进球、助攻、评分",
-        "射门 / 射正柱状图，解释机会质量",
-        "事件时间线快速闪回",
-        "结尾卡：评论区讨论最关键一分钟"
+        "比分卡开场",
+        "关键事件时间点",
+        "射门和射正数据卡",
+        `${leadPlayer.name}人物镜头位`,
+        "评论区问题卡"
       ],
-      voiceover: `这场${match.name}，如果只看 ${match.score} 会错过真正的内容价值。我们从${topic.coreAngle}切入，能看到比赛事实、数据证据和平台表达如何叠在一起。`,
-      materialList: ["比分图", "球员特写", "射门数据图", "事件时间线", "历史交锋图", "风险提示字幕"],
-      visuals: ["比分卡", "球员照片位", "柱状图", "时间线", "风险提示标签", "评论区问题卡"]
+      voiceover: ensurePublishable(`${scoreText}最值得讲的不是一句输赢，而是${topic.title}。用事实和数据讲，会比喊口号更稳。`, "douyin"),
+      materialList: ["比分卡", "球员图", "射门数据图", "事件时间线", "评论区问题卡"],
+      visuals: ["大比分字卡", "人物对照", "数据条形图", "时间线", "风险提示标签"]
     },
     article: {
-      title: `${topic.title}：${match.name}内容方案`,
-      intro: `这场比赛已经具备赛事结果、数据解读和平台分发价值。本文建议围绕“${topic.coreAngle}”展开，形成可用于公众号或专栏的完整复盘。`,
+      title: cleanTitle(`${match.name}：${topic.title}`, "article"),
+      intro: ensurePublishable(`${match.name}适合从${topic.title}切入。先交代比赛事实，再用数据和事件搭起复盘结构。`, "article"),
       fullOutline: [
-        "一、比赛信息与核心结论",
-        "二、关键事件时间线",
-        "三、数据洞察：控球、射门、射正和效率",
-        "四、人物叙事：主角、对照与历史意义",
-        "五、多平台分发策略",
-        "六、风险审稿与合规提醒"
+        "比赛基本信息和核心结论",
+        "关键事件时间线",
+        "数据证据和比赛观感",
+        "人物线和平台表达",
+        "发布风险和核验清单"
       ],
-      structure: ["比赛基本信息", "今日核心判断", "关键事件时间线", "数据图表解读", "人物与历史意义", "平台分发建议", "风险审稿提示"],
-      subheads: ["比分之外的比赛逻辑", "关键事件如何改变叙事", "数据能解释什么", "不同平台怎么拆", "发布前要核实什么"],
-      ending: "体育内容的价值不是替观众下结论，而是把事实、数据和叙事线整理得更清楚。",
-      chartPlacements: ["第一部分后插入比分卡", "第三部分插入控球率和射门图", "第四部分插入关键球员雷达图", "结尾前插入发布节奏表"],
-      chartSuggestions: ["控球率对比图放在战术段落", "射门 / 射正图放在机会质量段落", "关键球员雷达图放在人设段落", "事件时间线放在全文前半段"]
+      structure: ["事实", "事件", "数据", "人物", "风险"],
+      subheads: ["比分之外", "关键瞬间", "数据证据", "人物主线", "发布边界"],
+      ending: ensurePublishable("好的赛后内容不是替观众下结论，而是把事实、数据和叙事线整理清楚。", "article"),
+      chartPlacements: ["开头后放比分卡", "数据段放射门对比", "人物段放关键球员雷达", "结尾前放发布节奏"],
+      chartSuggestions: ["射门/射正对比", "控球率对比", "关键事件时间线", "平台分发清单"]
     }
   };
 

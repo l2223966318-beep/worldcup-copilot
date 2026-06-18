@@ -124,7 +124,7 @@ function answerQuestion(query: string, workflow: ReturnType<typeof readWorkflowS
 
   if (query.includes("风险")) {
     return review
-      ? `当前审稿等级：${review.level}，分数：${review.score}。建议：${review.advice}。如涉及伤病、判罚或黑幕类表达，请改成“需核实”“引发讨论”“建议补充来源”。`
+      ? `当前审稿等级：${review.level}，分数：${review.score}。建议：${review.advice}。如涉及伤病、判罚或高风险表达，请改成“需核验”“引发讨论”“发布前核验”。`
       : `可以先把当前文案送入风险审稿。待审稿文案摘要：${draft?.title ?? "暂无生成文案"}`;
   }
 

@@ -1,3 +1,4 @@
+import { ensurePublishable } from "@/lib/ai/quality";
 import type { AnalysisResult, ContentPackage, MatchContext, PlatformDraft, ReviewResultSnapshot, WorkflowTopic } from "@/types/workflow";
 
 export function createContentPackage(input: {
@@ -27,29 +28,36 @@ export function createPackageMarkdown(contentPackage: ContentPackage) {
     `- 比分：${matchInfo.score}`,
     `- 阶段：${matchInfo.stage}`,
     "",
-    "## 赛事分析",
-    analysis.summary,
+    "## 可直接发布版",
+    firstPublishableSection(platformDraft),
     "",
-    "## 胜负原因",
-    analysis.winLossReason,
+    "## 编辑参考版",
+    ensurePublishable(analysis.summary),
+    "",
+    ensurePublishable(analysis.winLossReason),
     "",
     "## 推荐选题",
-    `- 标题：${selectedTopic.title}`,
-    `- 类型：${selectedTopic.category}`,
-    `- 切入角度：${selectedTopic.coreAngle}`,
-    `- 风险：${selectedTopic.riskLevel}`,
+    `- 标题：${ensurePublishable(selectedTopic.title)}`,
+    `- 适合平台：${selectedTopic.recommendedFormat}`,
+    `- 核心看点：${ensurePublishable(selectedTopic.coreAngle)}`,
+    `- 推荐表达：${ensurePublishable(selectedTopic.reason)}`,
+    `- 风险提醒：${selectedTopic.riskLevel}`,
     "",
-    `## ${platformDraft.platform} 文案`,
+    `## ${platformDraft.platform} 完整稿件`,
     platformDraft.body,
     "",
-    "## 风险审稿",
+    "## 风险提示版",
     `- 等级：${reviewResult.level}`,
     `- 分数：${reviewResult.score}`,
-    `- 建议：${reviewResult.advice}`,
-    ...reviewResult.findings.map((finding) => `- ${finding.type}：${finding.rewrite}`)
-  ].join("\n");
+    `- 建议：${ensurePublishable(reviewResult.advice)}`,
+    ...reviewResult.findings.map((finding) => `- ${finding.type}：${ensurePublishable(finding.rewrite)}`)
+  ].map((line) => ensurePublishable(line)).join("\n");
 }
 
 export function createPackageText(contentPackage: ContentPackage) {
   return createPackageMarkdown(contentPackage).replace(/^#+\s*/gm, "");
+}
+
+function firstPublishableSection(platformDraft: PlatformDraft) {
+  return ensurePublishable(platformDraft.sections.find((section) => section.title.includes("可直接发布"))?.content ?? platformDraft.body);
 }

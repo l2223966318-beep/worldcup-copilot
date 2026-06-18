@@ -80,7 +80,7 @@ const signalRules: SignalRule[] = [
     recommendedPlatforms: ["微博", "B站", "公众号"],
     contentFormats: ["规则解释卡", "争议降风险版本", "长文规则段落"],
     topicSeed: (match, event) => `VAR介入后，${match.name}的争议点应该怎么讲才稳妥？`,
-    angleHints: ["先讲规则再讲观点", "建议补充权威来源", "避免黑哨/保送等定性词"]
+    angleHints: ["先讲规则再讲观点", "发布前核验权威来源", "避免黑哨/保送等定性词"]
   },
   {
     type: "controversial-call",
@@ -91,7 +91,7 @@ const signalRules: SignalRule[] = [
     recommendedPlatforms: ["微博", "公众号"],
     contentFormats: ["低风险讨论帖", "规则解释长文"],
     topicSeed: (match, event) => `${match.name}的争议判罚，内容该怎么做才不踩线？`,
-    angleHints: ["事实和观点分开", "使用需核实/建议补充来源", "不判断裁判主观动机"]
+    angleHints: ["事实和观点分开", "使用需核验/发布前核验", "不判断裁判主观动机"]
   },
   {
     type: "conflict",
@@ -113,7 +113,7 @@ const signalRules: SignalRule[] = [
     recommendedPlatforms: ["微博", "公众号"],
     contentFormats: ["需核实快讯", "赛后影响分析"],
     topicSeed: (match, event) => `${event.team}伤病信号会如何影响后续赛程？`,
-    angleHints: ["必须写需核实", "不写确认伤退", "建议补充官方消息来源"]
+    angleHints: ["必须写需核验", "不写确认伤退", "发布前核验官方消息"]
   },
   {
     type: "late-winner",
@@ -123,7 +123,7 @@ const signalRules: SignalRule[] = [
     riskLevel: "低",
     recommendedPlatforms: ["短视频", "B站", "微博"],
     contentFormats: ["读秒转折短视频", "时间线复盘", "微博情绪快评"],
-    topicSeed: (match, event) => `${event.minute}的关键瞬间，为什么会成为${match.name}的传播爆点？`,
+    topicSeed: (match, event) => `${event.minute}这个瞬间值得单独复盘`,
     angleHints: ["时间线天然清晰", "适合强节奏口播", "可做情绪共鸣但别过度煽动"]
   },
   {

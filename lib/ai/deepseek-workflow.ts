@@ -1,7 +1,7 @@
 import type { MatchData } from "@/data/matches";
 import { generatePlatformContent, type PlatformContent } from "@/lib/ai/content";
 import { generateDeepSeekJson } from "@/lib/ai/deepseek";
-import { qualityControl } from "@/lib/ai/quality";
+import { cleanList, cleanTitle, ensurePublishable, qualityControl } from "@/lib/ai/quality";
 import { buildSignalContext } from "@/lib/ai/signals";
 import type { TopicCategory, TopicIdea, TopicRecommendation } from "@/lib/ai/topics";
 
@@ -48,6 +48,20 @@ const DEFAULT_CATEGORY = "鏁版嵁瑙ｈ" as TopicCategory;
 const DEFAULT_RECOMMENDATION = "瑙傚療" as TopicRecommendation;
 const DEFAULT_LEVEL = "涓?" as TopicIdea["difficulty"];
 const DEFAULT_LOW_LEVEL = "浣?" as TopicIdea["riskLevel"];
+const PLATFORM_COPY_RULES = [
+  "标题必须短、准、有平台感：B站16-28字，微博12-22字，小红书12-20字。",
+  "禁止标题套标题、连续冒号、长问句、机械式“为什么……？”模板。",
+  "内容必须按三层思路生成：可直接发布版、编辑参考版、风险提示版。",
+  "可直接发布版排最前，短、顺、人话，复制后稍改就能发。",
+  "不得出现：这里需要补充来源、待补充、根据数据显示但无来源、变量残留。",
+  "不得编造伤病、冲突、内部矛盾、裁判争议；无来源只能写“需核验”。",
+  "mock/demo内容必须明确是演示口径，不要伪装成真实新闻。"
+].join("\n");
+const PLATFORM_FEW_SHOTS = {
+  bilibili: ["梅西这场，真把剧本踢满了", "法国追平那一刻，决赛才真正开始", "阿根廷夺冠不是童话，是熬出来的"],
+  weibo: ["这场决赛后劲太大了", "法国追平时，我以为剧本要反转", "梅西终于补上最后一块拼图"],
+  xiaohongshu: ["这场世界杯决赛为什么封神", "看懂阿根廷夺冠，只要这3个瞬间", "梅西圆梦夜，最戳人的不是冠军"]
+};
 const CATEGORY_ALIASES: Record<string, TopicCategory> = {
   战术复盘: "鎴樻湳澶嶇洏" as TopicCategory,
   球员叙事: "鐞冨憳鍙欎簨" as TopicCategory,
@@ -146,7 +160,9 @@ export async function enhanceMatchWorkflowWithDeepSeek(input: {
           match,
           matchSignals: signalContext.signals,
           matchSignalSummary: signalContext.summary,
-          baselineTopics
+          baselineTopics,
+          styleRules: PLATFORM_COPY_RULES,
+          fewShotTitles: PLATFORM_FEW_SHOTS
         })
       }
     ],
@@ -182,8 +198,8 @@ function normalizeConclusions(conclusions?: DeepSeekWorkflowResponse["conclusion
     .filter((item) => item?.title && item?.body)
     .slice(0, 3)
     .map((item, index) => ({
-      title: String(item.title),
-      body: String(item.body),
+      title: cleanTitle(String(item.title), "generic"),
+      body: ensurePublishable(String(item.body)),
       featured: Boolean(item.featured ?? index === 1)
     }));
 }
@@ -194,8 +210,8 @@ function normalizeTopics(matchId: string, topics: DeepSeekTopic[] | undefined, f
     const currentFallback = fallback[index] ?? fallbackTopic;
     return {
       id: `${matchId}-deepseek-${index + 1}`,
-      title: stringValue(topic.title, currentFallback?.title ?? "比赛内容运营选题"),
-      coreAngle: stringValue(topic.coreAngle, currentFallback?.coreAngle ?? "基于比赛事实、关键事件和传播价值拆解内容角度。"),
+      title: cleanTitle(stringValue(topic.title, currentFallback?.title ?? "比赛内容运营选题"), "generic"),
+      coreAngle: ensurePublishable(stringValue(topic.coreAngle, currentFallback?.coreAngle ?? "基于比赛事实、关键事件和传播价值拆解内容角度。")),
       category: normalizeCategory(topic.category, currentFallback?.category ?? DEFAULT_CATEGORY),
       recommendation: normalizeRecommendation(topic.recommendation, currentFallback?.recommendation ?? DEFAULT_RECOMMENDATION),
       newsValue: normalizeScore(topic.newsValue, currentFallback?.newsValue ?? 75),
@@ -205,14 +221,14 @@ function normalizeTopics(matchId: string, topics: DeepSeekTopic[] | undefined, f
       xiaohongshuFit: normalizeScore(topic.xiaohongshuFit, currentFallback?.xiaohongshuFit ?? 70),
       weiboFit: normalizeScore(topic.weiboFit, currentFallback?.weiboFit ?? 78),
       shortVideoFit: normalizeScore(topic.shortVideoFit, currentFallback?.shortVideoFit ?? 76),
-      recommendedFormat: stringValue(topic.recommendedFormat, currentFallback?.recommendedFormat ?? "B站复盘 + 微博讨论"),
+      recommendedFormat: ensurePublishable(stringValue(topic.recommendedFormat, currentFallback?.recommendedFormat ?? "B站复盘 + 微博讨论")),
       difficulty: normalizeLevel(topic.difficulty, currentFallback?.difficulty ?? DEFAULT_LEVEL),
       productionCost: normalizeLevel(topic.productionCost, currentFallback?.productionCost ?? DEFAULT_LEVEL),
       riskLevel: normalizeLevel(topic.riskLevel, currentFallback?.riskLevel ?? DEFAULT_LOW_LEVEL),
-      scoreReason: stringValue(topic.scoreReason, currentFallback?.scoreReason ?? "基于比赛事实、热点信号和平台适配综合评分。"),
-      businessExplanation: stringValue(topic.businessExplanation, currentFallback?.businessExplanation ?? "适合用于赛事内容运营拆解。"),
-      reason: stringValue(topic.reason, currentFallback?.reason ?? "基于当前比赛数据和热点信号生成。"),
-      sampleTitles: stringList(topic.sampleTitles, currentFallback?.sampleTitles ?? ["从一场比赛看内容机会", "比分之外的赛事复盘角度"]).slice(0, 3)
+      scoreReason: ensurePublishable(stringValue(topic.scoreReason, currentFallback?.scoreReason ?? "基于比赛事实、热点信号和平台适配综合评分。")),
+      businessExplanation: ensurePublishable(stringValue(topic.businessExplanation, currentFallback?.businessExplanation ?? "适合用于赛事内容运营拆解。")),
+      reason: ensurePublishable(stringValue(topic.reason, currentFallback?.reason ?? "基于当前比赛数据和热点信号生成。")),
+      sampleTitles: cleanList(stringList(topic.sampleTitles, currentFallback?.sampleTitles ?? ["这场球别只看比分", "真正的转折在这里"]), "generic", { title: true, max: 3 })
     } satisfies TopicIdea;
   });
 
@@ -224,30 +240,30 @@ function normalizePlatformContent(content: DeepSeekPlatformContent | undefined, 
     ...fallback,
     bilibili: {
       ...fallback.bilibili,
-      titles: stringList(content?.bilibili?.titles, fallback.bilibili.titles),
-      coverCopy: stringValue(content?.bilibili?.coverCopy, fallback.bilibili.coverCopy),
-      openingScript: stringValue(content?.bilibili?.openingScript, fallback.bilibili.openingScript),
+      titles: cleanList(stringList(content?.bilibili?.titles, fallback.bilibili.titles), "bilibili", { title: true, max: 5 }),
+      coverCopy: cleanTitle(stringValue(content?.bilibili?.coverCopy, fallback.bilibili.coverCopy), "bilibili"),
+      openingScript: ensurePublishable(stringValue(content?.bilibili?.openingScript, fallback.bilibili.openingScript), "bilibili"),
       outline: stringList(content?.bilibili?.outline, fallback.bilibili.outline),
       danmakuPoints: stringList(content?.bilibili?.danmakuPoints, fallback.bilibili.danmakuPoints)
     },
     weibo: {
       ...fallback.weibo,
       hashtags: stringList(content?.weibo?.hashtags, fallback.weibo.hashtags),
-      fiveMinuteComment: stringValue(content?.weibo?.fiveMinuteComment, fallback.weibo.fiveMinuteComment),
-      debateQuestion: stringValue(content?.weibo?.debateQuestion, fallback.weibo.debateQuestion),
-      riskTip: stringValue(content?.weibo?.riskTip, fallback.weibo.riskTip)
+      fiveMinuteComment: ensurePublishable(stringValue(content?.weibo?.fiveMinuteComment, fallback.weibo.fiveMinuteComment), "weibo"),
+      debateQuestion: ensurePublishable(stringValue(content?.weibo?.debateQuestion, fallback.weibo.debateQuestion), "weibo"),
+      riskTip: ensurePublishable(stringValue(content?.weibo?.riskTip, fallback.weibo.riskTip), "weibo")
     },
     xiaohongshu: {
       ...fallback.xiaohongshu,
-      coverTitle: stringValue(content?.xiaohongshu?.coverTitle, fallback.xiaohongshu.coverTitle),
-      cardTitles: stringList(content?.xiaohongshu?.cardTitles, fallback.xiaohongshu.cardTitles),
+      coverTitle: cleanTitle(stringValue(content?.xiaohongshu?.coverTitle, fallback.xiaohongshu.coverTitle), "xiaohongshu"),
+      cardTitles: cleanList(stringList(content?.xiaohongshu?.cardTitles, fallback.xiaohongshu.cardTitles), "xiaohongshu", { title: true, max: 5 }),
       cards: cardList(content?.xiaohongshu?.cards, fallback.xiaohongshu.cards),
       collectReason: stringValue(content?.xiaohongshu?.collectReason, fallback.xiaohongshu.collectReason)
     },
     article: {
       ...fallback.article,
-      title: stringValue(content?.article?.title, fallback.article.title),
-      intro: stringValue(content?.article?.intro, fallback.article.intro),
+      title: cleanTitle(stringValue(content?.article?.title, fallback.article.title), "article"),
+      intro: ensurePublishable(stringValue(content?.article?.intro, fallback.article.intro), "article"),
       fullOutline: stringList(content?.article?.fullOutline, fallback.article.fullOutline),
       ending: stringValue(content?.article?.ending, fallback.article.ending)
     }
@@ -271,8 +287,8 @@ function cardList(value: unknown, fallback: PlatformContent["xiaohongshu"]["card
   const list = value
     .filter((item): item is { title?: unknown; body?: unknown } => Boolean(item) && typeof item === "object")
     .map((item) => ({
-      title: stringValue(item.title, ""),
-      body: stringValue(item.body, "")
+      title: cleanTitle(stringValue(item.title, ""), "xiaohongshu"),
+      body: ensurePublishable(stringValue(item.body, ""), "xiaohongshu")
     }))
     .filter((item) => item.title && item.body);
   return list.length ? list : fallback;

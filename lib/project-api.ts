@@ -120,7 +120,7 @@ export function reviewContentRisk() {
 export function searchKnowledgeBase(query: string, projectId: string) {
   void projectId;
   if (query.includes("控球")) return "控球率高不一定代表优势，运营表达要继续看射正、关键事件和关键区域触球。";
-  if (query.includes("风险")) return "涉及黑哨、黑幕、确认伤退等定性说法时，应改为需核实、建议补充来源、建议人工确认。";
+  if (query.includes("风险")) return "涉及黑哨、黑幕、确认伤退等定性说法时，应改为需核验、引发讨论、发布前核验。";
   return "可以从术语解释、运营理解、内容表达和风险提示四个角度组织回答。";
 }
 

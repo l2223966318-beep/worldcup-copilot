@@ -194,6 +194,12 @@ function createMarkdown(matchName: string, topicTitle: string, content: ReturnTy
     `- 比赛：${matchName}`,
     `- 主选题：${topicTitle}`,
     "",
+    "## 可直接发布版",
+    `B站：${content.bilibili.titles[0]}`,
+    `微博：${content.weibo.fiveMinuteComment}`,
+    `小红书：${content.xiaohongshu.coverTitle}`,
+    "",
+    "## 编辑参考版",
     "## B站",
     ...content.bilibili.titles.map((item) => `- ${item}`),
     `- 推荐分区：${content.bilibili.recommendedSection}`,
@@ -213,6 +219,10 @@ function createMarkdown(matchName: string, topicTitle: string, content: ReturnTy
     "",
     "## 公众号 / 专栏",
     content.article.title,
-    ...content.article.fullOutline.map((item) => `- ${item}`)
+    ...content.article.fullOutline.map((item) => `- ${item}`),
+    "",
+    "## 风险提示版",
+    content.weibo.riskTip,
+    "没有来源的伤病、冲突、内部矛盾和裁判争议，都要先核验。"
   ].join("\n");
 }

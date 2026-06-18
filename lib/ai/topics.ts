@@ -1,5 +1,5 @@
 import type { MatchData } from "@/data/matches";
-import { qualityControl } from "@/lib/ai/quality";
+import { cleanList, cleanTitle, ensurePublishable, qualityControl } from "@/lib/ai/quality";
 import { extractMatchSignals, type MatchSignal } from "@/lib/ai/signals";
 
 export type TopicCategory =
@@ -119,7 +119,7 @@ export function generateTopics(match: MatchData): TopicIdea[] {
         })
       ];
 
-  return qualityControl([...signalTopics, ...topics]);
+  return polishTopics(qualityControl([...signalTopics, ...topics]));
 }
 
 function signalToTopic(match: MatchData, signal: MatchSignal, index: number): TopicIdea {
@@ -159,7 +159,7 @@ function signalToTopic(match: MatchData, signal: MatchSignal, index: number): To
     reason: `热点依据：${signal.minute}，${signal.evidence}。表达提示：${signal.angleHints.join("；")}。`,
     sampleTitles: [
       signal.topicSeed,
-      `${match.name}这个瞬间，为什么会成为赛后内容爆点？`
+      `${match.name}这个瞬间值得复盘`
     ]
   });
 }
@@ -338,4 +338,41 @@ function createTopic(
     reason: config.reason,
     sampleTitles: config.sampleTitles
   };
+}
+
+function polishTopics(topics: TopicIdea[]) {
+  return topics.map((topic) => {
+    const platform = pickTitlePlatform(topic);
+    const sampleTitles = cleanList([
+      ...topic.sampleTitles,
+      ...fallbackSampleTitles(topic)
+    ], platform, { title: true, max: 4 });
+
+    return {
+      ...topic,
+      title: cleanTitle(topic.title, platform),
+      coreAngle: ensurePublishable(topic.coreAngle),
+      recommendedFormat: ensurePublishable(topic.recommendedFormat),
+      scoreReason: ensurePublishable(topic.scoreReason),
+      businessExplanation: ensurePublishable(topic.businessExplanation),
+      reason: ensurePublishable(topic.reason),
+      sampleTitles
+    };
+  });
+}
+
+function pickTitlePlatform(topic: TopicIdea) {
+  if (topic.weiboFit >= topic.bilibiliFit && topic.weiboFit >= topic.xiaohongshuFit) return "weibo";
+  if (topic.xiaohongshuFit >= topic.bilibiliFit) return "xiaohongshu";
+  return "bilibili";
+}
+
+function fallbackSampleTitles(topic: TopicIdea) {
+  if (topic.weiboFit >= 88) {
+    return ["这场比赛后劲太大了", "这个瞬间值得再看一遍"];
+  }
+  if (topic.xiaohongshuFit >= 82) {
+    return ["看懂这场球的3个瞬间", "这场比赛为什么值得收藏"];
+  }
+  return ["这场球别只看比分", "真正的转折在这里"];
 }

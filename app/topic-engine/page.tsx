@@ -93,7 +93,10 @@ function TopicCard({ topic, selected, onSelect }: { topic: TopicIdea; selected: 
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 text-sm leading-7 text-slate-200">
-        <p className="text-base">{topic.coreAngle}</p>
+        <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
+          <div className="text-xs text-slate-300">核心看点</div>
+          <p className="mt-1 text-base text-slate-100">{topic.coreAngle}</p>
+        </div>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
           <Metric label="新闻价值" value={topic.newsValue} />
           <Metric label="传播潜力" value={topic.spreadPotential} />
@@ -107,7 +110,7 @@ function TopicCard({ topic, selected, onSelect }: { topic: TopicIdea; selected: 
           <InfoPill label="微博适配" value={`${topic.weiboFit}`} />
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
-          <div className="text-xs text-slate-300">推荐内容形式</div>
+          <div className="text-xs text-slate-300">适合平台</div>
           <div className="mt-1 font-semibold text-white">{topic.recommendedFormat}</div>
         </div>
         <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/[0.08] p-4">
@@ -118,7 +121,8 @@ function TopicCard({ topic, selected, onSelect }: { topic: TopicIdea; selected: 
           <div className="text-xs text-amber-100">为什么推荐这个选题</div>
           <p className="mt-1 text-slate-100">{topic.businessExplanation}</p>
         </div>
-        <p><span className="font-semibold text-white">选题理由：</span>{topic.reason}</p>
+        <p><span className="font-semibold text-white">推荐表达：</span>{topic.reason}</p>
+        <p><span className="font-semibold text-white">风险提醒：</span>{topic.riskLevel}风险，涉及伤病、冲突、判罚和内部信息时先核验。</p>
         <div>
           <div className="mb-2 text-xs text-slate-300">示例标题</div>
           <div className="space-y-2">

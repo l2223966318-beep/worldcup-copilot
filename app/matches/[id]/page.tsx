@@ -1457,24 +1457,37 @@ function buildSelectedContent(content: PlatformContent, platforms: PlatformKey[]
 
 function buildPlatformMarkdown(platform: PlatformKey, content: PlatformContent) {
   const preview = getPlatformPreview(platform, content);
-  return [`# ${platformMeta[platform].title} 内容预览`, "", preview.fullText].join("\n");
+  return [
+    `# ${platformMeta[platform].title} 内容预览`,
+    "",
+    "## 可直接发布版",
+    preview.items[0] ? `${preview.items[0].label}：${preview.items[0].value}` : preview.title,
+    "",
+    "## 编辑参考版",
+    preview.fullText,
+    "",
+    "## 风险提示版",
+    "涉及伤病、冲突、内部矛盾和裁判争议时，发布前先核验来源。"
+  ].join("\n");
 }
 
 function buildMarkdown(title: string, topic: TopicIdea, content: PlatformContent, advice: string) {
   return [
     `# ${title} 内容处理报告`,
     "",
-    "## 核心选题",
-    topic.title,
+    "## 可直接发布版",
+    `B站：${content.bilibili.titles[0]}`,
+    `微博：${content.weibo.fiveMinuteComment}`,
+    `小红书：${content.xiaohongshu.coverTitle}`,
     "",
-    "## 平台内容",
+    "## 编辑参考版",
+    `核心选题：${topic.title}`,
+    `核心看点：${topic.coreAngle}`,
     buildSelectedContent(content, ["bilibili", "weibo", "xiaohongshu", "article"]),
     "",
-    "## 风险审稿",
+    "## 风险提示版",
     `发布建议：${advice}`,
-    "",
-    "## 合规说明",
-    "当前内容基于示例数据生成，仅作为运营创作辅助，发布前需人工核实事实、数据来源和平台规则。"
+    "当前内容基于项目数据和规则生成。发布前需核实事实、数据来源、素材版权和平台规则。"
   ].join("\n");
 }
 

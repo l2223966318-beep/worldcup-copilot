@@ -1,7 +1,7 @@
 import type { KnowledgeEntry } from "@/data/knowledge";
 import type { MatchData } from "@/data/matches";
 import type { PlatformContent } from "@/lib/ai/content";
-import { cleanText, qualityControl } from "@/lib/ai/quality";
+import { cleanText, cleanTitle, ensurePublishable, qualityControl } from "@/lib/ai/quality";
 import type { RiskReviewResult } from "@/lib/ai/risk";
 import type { TopicIdea } from "@/lib/ai/topics";
 
@@ -26,10 +26,17 @@ export function createMarkdownReport(input: ReportInput) {
   const safeTopics = qualityControl(topics);
 
   const lines = [
-    `# ${match.name} 赛事热点拆解与多平台分发方案`,
+    `# ${match.name} 内容方案`,
     "",
-    "## 核心结论",
-    `${match.name} 的内容主线应围绕“${topTopic.title}”展开。它兼具人物叙事、历史意义和平台传播价值，适合作为主推选题。战术复盘和数据异常作为证据层，风险审稿作为发布前闸口。`,
+    "## 可直接发布版",
+    `B站：${cleanTitle(content.bilibili.titles[0], "bilibili")}`,
+    `微博：${ensurePublishable(content.weibo.fiveMinuteComment, "weibo")}`,
+    `小红书：${cleanTitle(content.xiaohongshu.coverTitle, "xiaohongshu")}`,
+    "",
+    "## 编辑参考版",
+    `主线：${ensurePublishable(topTopic.title)}`,
+    `核心看点：${ensurePublishable(topTopic.coreAngle)}`,
+    `推荐表达：${ensurePublishable(topTopic.reason)}`,
     "",
     "## 比赛信息",
     `- 阶段：${match.stage}`,
@@ -39,7 +46,7 @@ export function createMarkdownReport(input: ReportInput) {
     "- 数据来源：示例数据。正式发布前需替换为授权体育数据或公开统计口径。",
     "",
     "## 内容优先级",
-    ...safeTopics.slice(0, 6).map((topic, index) => `${index + 1}. ${topic.recommendation}｜${topic.title}｜新闻价值 ${topic.newsValue}｜传播潜力 ${topic.spreadPotential}｜风险 ${topic.riskLevel}｜${topic.businessExplanation}`),
+    ...safeTopics.slice(0, 6).map((topic, index) => `${index + 1}. ${topic.recommendation}｜${cleanTitle(topic.title)}｜适合平台：${topic.recommendedFormat}｜风险：${topic.riskLevel}`),
     "",
     "## 平台分发策略",
     `- B站：${content.bilibili.titles[0]}。分区建议：${content.bilibili.recommendedSection}；时长建议：${content.bilibili.recommendedDuration}。`,
@@ -56,7 +63,7 @@ export function createMarkdownReport(input: ReportInput) {
     "## 发布节奏",
     ...cadence.map(([time, type, owner, review]) => `- ${time}：${type}｜负责人：${owner}｜审核重点：${review}`),
     "",
-    "## 风险审稿",
+    "## 风险提示版",
     `- 当前风险等级：${risk.level}`,
     `- 风险分数：${risk.score}`,
     `- 发布建议：${risk.advice}`,

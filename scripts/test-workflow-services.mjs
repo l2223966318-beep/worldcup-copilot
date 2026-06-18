@@ -6,6 +6,7 @@ import ts from "typescript";
 
 const files = [
   "types/workflow.ts",
+  "lib/ai/quality.ts",
   "lib/services/analysisService.ts",
   "lib/services/contentService.ts",
   "lib/services/exportService.ts"
@@ -14,13 +15,15 @@ const files = [
 const outDir = join(tmpdir(), "worldcup-copilot-workflow-test");
 if (existsSync(outDir)) rmSync(outDir, { recursive: true, force: true });
 mkdirSync(join(outDir, "types"), { recursive: true });
+mkdirSync(join(outDir, "lib/ai"), { recursive: true });
 mkdirSync(join(outDir, "lib/services"), { recursive: true });
 
 for (const file of files) {
   const sourcePath = new URL(`../${file}`, import.meta.url);
   const source = readFileSync(sourcePath, "utf8")
     .replaceAll("@/types/workflow", "../../types/workflow.mjs")
-    .replaceAll("@/lib/services/contentService", "./contentService.mjs");
+    .replaceAll("@/lib/services/contentService", "./contentService.mjs")
+    .replaceAll("@/lib/ai/quality", "../ai/quality.mjs");
   const compiled = ts.transpileModule(source, {
     compilerOptions: {
       module: ts.ModuleKind.ES2022,
@@ -74,7 +77,7 @@ const douyin = createPlatformDraft("douyin", matchContext, topic, analysis);
 const bilibili = createPlatformDraft("bilibili", matchContext, topic, analysis);
 assert.equal(supportedPlatforms.includes("douyin"), true);
 assert.notEqual(douyin.body, bilibili.body);
-assert.ok(douyin.body.includes("前三秒"));
+assert.ok(douyin.body.includes("可直接发布版"));
 
 const pkg = createContentPackage({
   matchContext,
@@ -85,6 +88,6 @@ const pkg = createContentPackage({
 });
 assert.equal(pkg.matchInfo.name, "美国 vs 巴拉圭");
 assert.equal(pkg.platformDraft.platform, "douyin");
-assert.ok(createPackageMarkdown(pkg).includes("内容包"));
+assert.ok(createPackageMarkdown(pkg).includes("可直接发布版"));
 
 console.log("workflow services ok");
