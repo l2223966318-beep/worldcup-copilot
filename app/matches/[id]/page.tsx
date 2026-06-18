@@ -16,12 +16,6 @@ import {
 } from "lucide-react";
 
 import { InsightCharts } from "@/components/worldcup/insight-charts";
-import {
-  OpportunityMetricBars,
-  OpportunityQuadrant,
-  OpportunityRiskCard,
-  PlatformFitCompare
-} from "@/components/worldcup/opportunity-visuals";
 import type { MatchData } from "@/data/matches";
 import { generatePlatformContent, type PlatformContent } from "@/lib/ai/content";
 import { reviewRisk } from "@/lib/ai/risk";
@@ -33,7 +27,6 @@ import { createRuleBasedAnalysis } from "@/lib/services/analysisService";
 import { createPlatformDraft } from "@/lib/services/contentService";
 import { createContentPackage, createPackageMarkdown, createPackageText } from "@/lib/services/exportService";
 import { localizeMatchStatus, localizeRoundName, localizeTeamName } from "@/lib/services/footballNames";
-import { buildDetailOpportunityModel } from "@/lib/services/opportunityModel";
 import { appendHistoryRecord, writeReviewDraft, writeWorkflowState } from "@/lib/services/workflowStore";
 import { worldCupMatchToMatchData } from "@/lib/sports/adapters";
 import { useWorldCupQuery } from "@/lib/sports/client";
@@ -102,10 +95,6 @@ export default function MatchAnalysisPage() {
   const [selectedTopicId, setSelectedTopicId] = useState(topics[0]?.id);
   const selectedTopic = topics.find((topic) => topic.id === selectedTopicId) ?? topics[0];
   const workflow = useMemo(() => buildMatchWorkflow(match, topics[0], analysis, aiEnhancement), [aiEnhancement, analysis, match, topics]);
-  const detailOpportunity = useMemo(
-    () => buildDetailOpportunityModel(match, selectedTopic, payload?.sourceStatus ?? "fallback"),
-    [match, payload?.sourceStatus, selectedTopic]
-  );
   const [activePlatform, setActivePlatform] = useState<PlatformKey>("bilibili");
   const [copied, setCopied] = useState<string | null>(null);
   const [rewriteApplied, setRewriteApplied] = useState<string | null>(null);
@@ -278,36 +267,6 @@ export default function MatchAnalysisPage() {
       />
 
       <AiBrainStatus loading={aiLoading} enhancement={aiEnhancement} theme={theme} />
-
-      <section className="rounded-[32px] border bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.06)]" style={{ borderColor: theme.border }}>
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">OPPORTUNITY MODEL</div>
-            <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">内容机会判断矩阵</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-              用同一套五维模型判断这场比赛值不值得做，避免只因为热度高就直接判成高价值。
-            </p>
-          </div>
-          <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
-            当前结论：{detailOpportunity.recommendation} · 价值分 {detailOpportunity.valueScore}
-          </div>
-        </div>
-        <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-          <div className="grid gap-5">
-            <OpportunityQuadrant heat={detailOpportunity.heat} scarcity={detailOpportunity.scarcity} theme={theme} />
-            <PlatformFitCompare platformFits={detailOpportunity.platformFits} theme={theme} />
-          </div>
-          <div className="grid gap-5">
-            <div className="rounded-3xl border bg-white p-4" style={{ borderColor: theme.border }}>
-              <div className="text-sm font-semibold text-slate-900">五维评分条</div>
-              <div className="mt-4">
-                <OpportunityMetricBars model={detailOpportunity} theme={theme} />
-              </div>
-            </div>
-            <OpportunityRiskCard model={detailOpportunity} theme={theme} />
-          </div>
-        </div>
-      </section>
 
       <section className="rounded-[32px] border bg-white p-5 shadow-[0_20px_70px_rgba(15,23,42,0.06)]" style={{ borderColor: theme.border }}>
         <div className="flex flex-wrap items-center justify-between gap-4">
