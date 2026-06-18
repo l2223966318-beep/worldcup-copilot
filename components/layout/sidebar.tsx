@@ -47,13 +47,6 @@ export function Sidebar() {
           );
         })}
       </nav>
-
-      <div className="mt-auto rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <div className="text-sm font-semibold text-slate-950">当前流程</div>
-        <p className="mt-2 text-xs leading-5 text-slate-500">
-          今日比赛池 → 单场分析 → 平台内容 → 风险审稿 → 复制导出。
-        </p>
-      </div>
     </aside>
   );
 }

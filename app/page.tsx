@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, CheckCircle2, CircleDot, Flame, Palette, ShieldAlert, Sparkles, Trophy } from "lucide-react";
+import { ArrowRight, Palette, Trophy } from "lucide-react";
 
 import { HotTopicRadarPanel } from "@/components/worldcup/hot-topic-radar-panel";
 import { localizeCompetitionName, localizeMatchStatus, localizeRoundName, localizeTeamName, localizeVenueText } from "@/lib/services/footballNames";
@@ -55,7 +55,6 @@ export default function DashboardPage() {
   });
   const watchMatches = filteredMatches.filter((item) => getOpportunityGrade(item) === "B");
   const lowPriorityMatches = filteredMatches.filter((item) => getOpportunityGrade(item) === "C");
-  const firstMatchHref = filteredMatches[0] ? `/matches/${filteredMatches[0].id}` : "/matches/argentina-france-2022-final";
   const heroOpsState = getOpsState({
     loading,
     error,
@@ -108,15 +107,9 @@ export default function DashboardPage() {
         <HeroPattern theme={theme} />
         <div className="relative z-10 grid gap-5 lg:grid-cols-[1fr_320px] lg:items-center">
           <div>
-            <div className="inline-flex rounded-full bg-white/80 px-3 py-1.5 text-xs font-semibold shadow-sm" style={{ color: theme.secondary }}>
-              当前项目：2026 世界杯内容运营
-            </div>
-            <h1 className="mt-5 max-w-4xl text-4xl font-black leading-tight tracking-tight text-slate-950 lg:text-6xl">
+            <h1 className="max-w-4xl text-4xl font-black leading-tight tracking-tight text-slate-950 lg:text-6xl">
               WorldCup Copilot
             </h1>
-            <p className="mt-3 max-w-2xl text-base leading-7 text-slate-700 lg:text-lg">
-              从赛事数据到平台分发，帮运营人员快速找到值得做的内容角度。
-            </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Link
                 href="#opportunity-pool"
@@ -144,9 +137,6 @@ export default function DashboardPage() {
               <HeroMetric label="观望" value={heroOpsState.metrics.watch} theme={theme} />
               <HeroMetric label="不投入" value={heroOpsState.metrics.low} theme={theme} />
             </div>
-            <div className="mt-3 rounded-2xl p-3 text-xs leading-5" style={{ backgroundColor: theme.background, color: theme.mutedText }}>
-              {heroOpsState.copy}
-            </div>
           </div>
         </div>
       </section>
@@ -155,7 +145,7 @@ export default function DashboardPage() {
         <div className="min-w-0 space-y-8">
           <section id="opportunity-pool">
             <div className="flex flex-wrap items-end justify-between gap-4">
-              <SectionTitle eyebrow="今日机会池" title="今日赛事内容机会池" description="数据来自内部服务端接口，足球数据密钥不会暴露给浏览器。" />
+              <SectionTitle title="今日赛事内容机会池" />
               <SourceBadge
                 status={activeStatus}
                 provider={readPayloadProvider(activePayload?.data)}
@@ -244,51 +234,6 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          <section className="grid gap-5 lg:grid-cols-[1fr_1fr]">
-            <div className="rounded-[32px] border bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.06)]" style={{ borderColor: theme.border }}>
-              <SectionTitle eyebrow="运营判断" title="今日运营建议" description="把比赛转成可执行排期，而不是让用户自己在功能里找方向。" />
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <DecisionCard icon={CheckCircle2} title="今日优先做" value={heroOpsState.cards.priority.value} body={heroOpsState.cards.priority.body} theme={theme} />
-                <DecisionCard icon={CircleDot} title="观望比赛" value={heroOpsState.cards.watch.value} body={heroOpsState.cards.watch.body} theme={theme} />
-                <DecisionCard icon={Sparkles} title="今日主推方向" value={heroOpsState.cards.direction.value} body={heroOpsState.cards.direction.body} theme={theme} />
-                <DecisionCard icon={ShieldAlert} title="今日风险提醒" value={heroOpsState.cards.risk.value} body={heroOpsState.cards.risk.body} theme={theme} />
-              </div>
-            </div>
-
-            <div className="rounded-[32px] border bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.06)]" style={{ borderColor: theme.border }}>
-              <SectionTitle eyebrow="经典样例" title="历史经典样例" description="真实数据暂缺时，仍保留高完成度演示样例入口。" />
-              <div className="mt-6 space-y-4">
-                <Link
-                  href={firstMatchHref}
-                  className="group block rounded-[26px] border bg-slate-50 p-5 transition hover:-translate-y-1 hover:bg-white hover:shadow-[0_20px_54px_rgba(15,23,42,0.08)]"
-                  style={{ borderColor: theme.border }}
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <div className="text-sm font-semibold" style={{ color: theme.primary }}>今日数据链路入口</div>
-                      <div className="mt-2 text-xl font-semibold text-slate-950">进入第一场比赛分析</div>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">真实比赛编号会进入足球数据详情链路；历史样例继续走演示数据。</p>
-                    </div>
-                    <ArrowRight className="h-5 w-5 text-slate-400 transition group-hover:translate-x-1 group-hover:text-slate-950" />
-                  </div>
-                </Link>
-                <Link
-                  href="/matches/argentina-france-2022-final"
-                  className="group block rounded-[26px] border bg-slate-50 p-5 transition hover:-translate-y-1 hover:bg-white hover:shadow-[0_20px_54px_rgba(15,23,42,0.08)]"
-                  style={{ borderColor: theme.border }}
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <div className="text-sm font-semibold" style={{ color: theme.primary }}>经典样例</div>
-                      <div className="mt-2 text-xl font-semibold text-slate-950">阿根廷 3-3 法国</div>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">保留为历史经典演示样例，方便没有接口密钥时完整演示。</p>
-                    </div>
-                    <ArrowRight className="h-5 w-5 text-slate-400 transition group-hover:translate-x-1 group-hover:text-slate-950" />
-                  </div>
-                </Link>
-              </div>
-            </div>
-          </section>
         </div>
 
         <HotTopicRadarPanel theme={theme} matches={matches} />
@@ -326,12 +271,12 @@ function HeroPattern({ theme }: { theme: SportTheme }) {
   );
 }
 
-function SectionTitle({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
+function SectionTitle({ eyebrow, title, description }: { eyebrow?: string; title: string; description?: string }) {
   return (
     <div>
-      <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">{eyebrow}</div>
-      <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{title}</h2>
-      <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">{description}</p>
+      {eyebrow ? <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">{eyebrow}</div> : null}
+      <h2 className={eyebrow ? "mt-2 text-3xl font-semibold tracking-tight text-slate-950" : "text-3xl font-semibold tracking-tight text-slate-950"}>{title}</h2>
+      {description ? <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">{description}</p> : null}
     </div>
   );
 }
@@ -433,7 +378,7 @@ function OpportunityMatchCard({
 
   return (
     <article
-      className="grid gap-5 rounded-[30px] border bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] transition hover:-translate-y-1 hover:shadow-[0_28px_80px_rgba(15,23,42,0.1)] lg:grid-cols-[90px_1fr_220px]"
+      className="grid gap-5 rounded-[30px] border bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] transition hover:-translate-y-1 hover:shadow-[0_28px_80px_rgba(15,23,42,0.1)] lg:grid-cols-[90px_1fr_180px]"
       style={{ borderColor: theme.border }}
     >
       <div className="flex items-center gap-3 lg:block">
@@ -461,9 +406,7 @@ function OpportunityMatchCard({
           <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{statusText}</span>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{round}</span>
           <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">风险：{risk}</span>
-          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">数据：{sourceLabel(sourceStatus, match.source.provider)}</span>
         </div>
-        <p className="mt-3 text-sm leading-6 text-slate-600">推荐内容主线：{opportunity.reason}</p>
         <div className="mt-4 flex flex-wrap gap-2">
           {["B站", "微博", "赛后复盘", "数据解读", localizeVenue(match.venue.city ?? match.venue.name)].map((direction) => (
             <span key={direction} className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
@@ -472,13 +415,10 @@ function OpportunityMatchCard({
           ))}
         </div>
       </div>
-      <div className="flex flex-col justify-between gap-4">
-        <div className="rounded-2xl p-4 text-sm leading-6" style={{ backgroundColor: theme.background, color: theme.mutedText }}>
-          推荐平台：B站深度复盘 + 微博话题扩散
-        </div>
+      <div className="flex items-end justify-end">
         <Link
           href={`/matches/${match.id}`}
-          className="inline-flex h-12 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold text-white transition hover:-translate-y-0.5"
+          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold text-white transition hover:-translate-y-0.5"
           style={{ backgroundColor: theme.primary, boxShadow: `0 18px 38px ${theme.heroGlow}` }}
         >
           进入分析
@@ -513,17 +453,6 @@ function SourceBadge({
         {lastUpdated ? `最后更新：${formatDate(lastUpdated)}` : "等待接口返回"}
         {error ? `｜${error}` : ""}
       </div>
-    </div>
-  );
-}
-
-function DecisionCard({ icon: Icon, title, value, body, theme }: { icon: typeof Flame; title: string; value: string; body: string; theme: SportTheme }) {
-  return (
-    <div className="rounded-[24px] border bg-slate-50 p-4" style={{ borderColor: theme.border }}>
-      <Icon className="h-5 w-5" style={{ color: theme.primary }} />
-      <div className="mt-4 text-sm font-semibold text-slate-500">{title}</div>
-      <div className="mt-1 text-2xl font-black text-slate-950">{value}</div>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
     </div>
   );
 }

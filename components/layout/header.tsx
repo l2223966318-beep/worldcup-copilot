@@ -7,8 +7,6 @@ import { Clock3, Search, Settings, Trophy } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-const workflow = ["今日比赛池", "单场分析", "平台内容", "风险审稿", "复制导出"];
-
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
@@ -45,22 +43,6 @@ export function Header() {
             <div className="hidden text-xs text-slate-500 sm:block">赛事内容运营工作台</div>
           </div>
         </Link>
-
-        <nav className="hidden flex-1 items-center justify-center gap-2 xl:flex">
-          {workflow.map((step, index) => (
-            <div key={step} className="flex items-center gap-2">
-              <span
-                className={cn(
-                  "rounded-full px-3 py-1.5 text-xs font-semibold",
-                  pathname.startsWith("/matches") && index <= 4 ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
-                )}
-              >
-                {step}
-              </span>
-              {index < workflow.length - 1 ? <span className="h-px w-5 bg-slate-200" /> : null}
-            </div>
-          ))}
-        </nav>
 
         <div className="flex items-center gap-2">
           <form

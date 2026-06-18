@@ -119,19 +119,11 @@ export function HotTopicRadarPanel({
           </button>
         </div>
 
-        <div className="mt-4 rounded-2xl p-4 text-xs leading-6" style={{ backgroundColor: theme.background, color: theme.mutedText }}>
-          <div className="font-semibold text-slate-800">数据源状态</div>
-          <div>热点 API：UApiPro 每日热榜 / 小红书配置源 / 小红书公开搜索</div>
-          <div>来源定位：赛事热点补充数据源</div>
-          <div>智能筛选：分类、标签和借势价值加工层</div>
-          <div>排序逻辑：按价值分优先，不随左侧比赛切换。</div>
-          <div className="mt-2 font-semibold">
-            状态：{sourceStatusLabel(sourceStatus)}
-            {lastUpdatedAt ? ` · 更新时间：${formatHotTime(lastUpdatedAt)}` : " · 暂无缓存"}
-          </div>
+        <div className="mt-3 text-xs font-semibold text-slate-400">
+          {sourceStatusLabel(sourceStatus)}
+          {lastUpdatedAt ? ` · ${formatHotTime(lastUpdatedAt)}` : ""}
         </div>
 
-        {message ? <div className="mt-3 text-xs leading-5 text-slate-500">{message}</div> : null}
         {error ? (
           <div className="mt-3 rounded-2xl bg-red-50 px-4 py-3 text-xs font-semibold text-red-600">
             {error}
@@ -189,12 +181,10 @@ export function HotTopicRadarPanel({
                         {topic.category ? <Badge>{topic.category}</Badge> : null}
                         {topic.leverageValue ? <Badge strong={topic.leverageValue === "高价值"}>{topic.leverageValue}</Badge> : null}
                       </div>
-                      <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{topic.summary || "等待补充摘要。"}</p>
                       <div className="mt-2 text-xs font-semibold" style={{ color: theme.secondary }}>
                         热度：{topic.heat ?? topic.relevanceScore ?? "-"}
                         {typeof topic.valueScore === "number" ? `｜价值分：${topic.valueScore}` : ""}
                       </div>
-                      {topic.updatedAt ? <div className="mt-1 text-[11px] font-semibold text-slate-400">发布时间：{formatHotTime(topic.updatedAt)}</div> : null}
                       <div className="mt-3 flex flex-wrap gap-2">
                         <button
                           type="button"
@@ -385,12 +375,12 @@ function filterByTab(topic: HotTopic, tab: HotTab) {
 
 function emptyStateText(tab: HotTab, message: string) {
   if (tab === "B站") {
-    return "B站热榜接口已接通，但当前 B站热榜里暂未筛到世界杯、足球或体育相关内容；系统不会用无关游戏/生活热榜冒充赛事热点。";
+    return "当前 B站暂无可展示的赛事热点。";
   }
   if (tab === "小红书") {
-    return message || "小红书没有可靠官方热榜源；请配置 XHS_HOT_API_URL，或配置 TAVILY_API_KEY 走小红书公开搜索。";
+    return "当前小红书暂无可展示的赛事热点。";
   }
-  return message || "点击“更新热点”获取最新内容。页面不会自动频繁请求热点接口。";
+  return message ? "当前暂无可展示的赛事热点。" : "点击更新热点获取最新内容。";
 }
 
 function formatHotTime(value: string) {
