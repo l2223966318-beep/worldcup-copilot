@@ -9,10 +9,7 @@ import {
   Check,
   Clipboard,
   Download,
-  RefreshCcw,
-  ShieldAlert,
-  Sparkles,
-  TrendingUp
+  RefreshCcw
 } from "lucide-react";
 
 import { InsightCharts } from "@/components/worldcup/insight-charts";
@@ -29,7 +26,7 @@ import { createRuleBasedAnalysis } from "@/lib/services/analysisService";
 import { contentTypeOptions, createPlatformDraft, topicModeOptions, type ContentTypeKey, type TopicModeKey } from "@/lib/services/contentService";
 import { createContentPackage, createPackageMarkdown, createPackageText } from "@/lib/services/exportService";
 import { localizeMatchStatus, localizeRoundName, localizeTeamName, localizeVenueText } from "@/lib/services/footballNames";
-import { buildDraftReviewFlow, buildMatchHotspotShortlist, mergeHotSearchPayloads } from "@/lib/services/matchDetailPresentation";
+import { buildDraftReviewFlow, buildMatchHotspotShortlist, mergeHotSearchPayloads, type DraftReviewFlow } from "@/lib/services/matchDetailPresentation";
 import { appendHistoryRecord, writeReviewDraft, writeWorkflowState } from "@/lib/services/workflowStore";
 import { worldCupMatchToMatchData } from "@/lib/sports/adapters";
 import { useWorldCupQuery } from "@/lib/sports/client";
@@ -48,7 +45,6 @@ const platformLabels = {
 const SETTINGS_STORAGE_KEY = "worldcup.datasource.settings";
 
 type PlatformKey = keyof typeof platformLabels;
-type PublishGoalKey = keyof typeof publishGoals;
 type PlatformFit = "主推" | "可做" | "谨慎";
 
 type OpportunityScores = {
@@ -62,7 +58,6 @@ type PlatformDecision = {
   fit: PlatformFit;
   score: number;
   reason: string;
-  defaultGoal: PublishGoalKey;
   deliverable: string;
   caution: string;
 };
@@ -84,15 +79,6 @@ const platformMeta: Record<PlatformKey, { title: string; positioning: string; ac
   douyin: { title: "抖音", positioning: "短视频口播、前三秒钩子、节奏分镜", action: "生成抖音口播" },
   article: { title: "公众号", positioning: "深度评论、历史纵深、长文沉淀", action: "生成公众号长文" }
 };
-
-const publishGoals = {
-  quickHot: { label: "快速蹭热" },
-  deepReview: { label: "深度复盘" },
-  debate: { label: "争议讨论" },
-  playerStory: { label: "球员故事" },
-  dataRead: { label: "数据解读" },
-  emotionClose: { label: "情绪收口" }
-} as const;
 
 export default function MatchAnalysisPage() {
   const params = useParams<{ id: string }>();
@@ -120,13 +106,14 @@ export default function MatchAnalysisPage() {
   const selectedTopic = topics.find((topic) => topic.id === selectedTopicId) ?? topics[0];
   const workflow = useMemo(() => buildMatchWorkflow(match, topics[0], analysis, aiEnhancement), [aiEnhancement, analysis, match, topics]);
   const [activePlatform, setActivePlatform] = useState<PlatformKey>("bilibili");
-  const [activePublishGoal, setActivePublishGoal] = useState<PublishGoalKey>("deepReview");
   const [activeContentType, setActiveContentType] = useState<ContentTypeKey>("topic");
   const [activeTopicMode, setActiveTopicMode] = useState<TopicModeKey>("professional");
   const [copied, setCopied] = useState<string | null>(null);
-  const [rewriteApplied, setRewriteApplied] = useState<string | null>(null);
   const [manualAnalysis, setManualAnalysis] = useState<AnalysisResult | null>(null);
   const [manualDraft, setManualDraft] = useState<PlatformDraft | null>(null);
+  const [draftLoading, setDraftLoading] = useState(false);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [aiReviewFlow, setAiReviewFlow] = useState<DraftReviewFlow | null>(null);
   const [workflowNotice, setWorkflowNotice] = useState("");
   const [matchHotItems, setMatchHotItems] = useState<HotItem[]>([]);
   const [hotspotLoading, setHotspotLoading] = useState(false);
@@ -149,14 +136,14 @@ export default function MatchAnalysisPage() {
   );
   const workflowTopic = useMemo(() => topicToWorkflowTopic(selectedTopic), [selectedTopic]);
   const platformDecisions = useMemo(() => buildPlatformDecisions(match, matchSignals, selectedTopic), [match, matchSignals, selectedTopic]);
-  const activePlatformDecision = platformDecisions[activePlatform];
   const activeWorkflowDraft = useMemo(
     () => manualDraft ?? createPlatformDraft(toWorkflowPlatform(activePlatform), matchContext, workflowTopic, manualAnalysis ?? createRuleBasedAnalysis(matchContext), { contentType: activeContentType, topicMode: activeTopicMode }),
     [activeContentType, activePlatform, activeTopicMode, manualAnalysis, manualDraft, matchContext, workflowTopic]
   );
   const reviewSourceText = draftForReview.trim() || getPublishableDraftText(activeWorkflowDraft);
   const reviewResult = useMemo(() => reviewRisk(reviewSourceText), [reviewSourceText]);
-  const reviewFlow = useMemo(() => buildDraftReviewFlow(reviewSourceText, match, reviewResult), [match, reviewResult, reviewSourceText]);
+  const localReviewFlow = useMemo(() => buildDraftReviewFlow(reviewSourceText, match, reviewResult), [match, reviewResult, reviewSourceText]);
+  const reviewFlow = aiReviewFlow ?? localReviewFlow;
   const markdown = useMemo(() => buildMarkdown(match.name, selectedTopic, content, reviewFlow.result.advice), [content, match.name, reviewFlow.result.advice, selectedTopic]);
   const matchHotspots = useMemo(
     () => buildMatchHotspotShortlist({ match, signals: matchSignals, hotItems: matchHotItems }),
@@ -279,12 +266,36 @@ export default function MatchAnalysisPage() {
     showWorkflowNotice("选题已生成，可继续生成平台文案。");
   }
 
-  function handleGeneratePlatformDraft() {
+  async function handleGeneratePlatformDraft() {
     const analysisSnapshot = manualAnalysis ?? createRuleBasedAnalysis(matchContext);
-    const draft = createPlatformDraft(toWorkflowPlatform(activePlatform), matchContext, workflowTopic, analysisSnapshot, { contentType: activeContentType, topicMode: activeTopicMode });
+    const fallbackDraft = createPlatformDraft(toWorkflowPlatform(activePlatform), matchContext, workflowTopic, analysisSnapshot, { contentType: activeContentType, topicMode: activeTopicMode });
+    setDraftLoading(true);
+    let draft = fallbackDraft;
+
+    try {
+      const response = await fetch("/api/ai/platform-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          platform: toWorkflowPlatform(activePlatform),
+          contentType: activeContentType,
+          topicMode: activeTopicMode,
+          matchContext,
+          topic: workflowTopic,
+          analysis: analysisSnapshot,
+          apiKey: getStoredDeepseekKey() || undefined
+        })
+      });
+      const payload = (await response.json()) as { sourceStatus: "live" | "fallback" | "error"; draft?: PlatformDraft; message?: string };
+      if (payload.sourceStatus === "live" && payload.draft) draft = payload.draft;
+    } catch {
+      draft = fallbackDraft;
+    }
+
     setManualAnalysis(analysisSnapshot);
     setManualDraft(draft);
     setDraftForReview(getPublishableDraftText(draft));
+    setAiReviewFlow(null);
     writeWorkflowState({
       currentMatch: matchContext,
       analysisResult: analysisSnapshot,
@@ -292,10 +303,10 @@ export default function MatchAnalysisPage() {
       selectedPlatform: draft.platform,
       generatedContent: draft
     });
-    showWorkflowNotice(`${platformMeta[activePlatform].title} 文案已生成。`);
+    setDraftLoading(false);
   }
 
-  function handleSendToReview() {
+  async function handleAiReview() {
     writeReviewDraft(reviewSourceText);
     writeWorkflowState({
       currentMatch: matchContext,
@@ -303,7 +314,41 @@ export default function MatchAnalysisPage() {
       selectedPlatform: activeWorkflowDraft.platform,
       generatedContent: { ...activeWorkflowDraft, body: reviewSourceText }
     });
-    showWorkflowNotice("已送入风险审稿模块。");
+
+    setReviewLoading(true);
+    try {
+      const response = await fetch("/api/ai/review-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          draft: reviewSourceText,
+          matchContext,
+          apiKey: getStoredDeepseekKey() || undefined
+        })
+      });
+      const payload = (await response.json()) as {
+        sourceStatus: "live" | "fallback" | "error";
+        result?: DraftReviewFlow["result"];
+        riskPoints?: string[];
+        rewriteSuggestion?: string;
+        checklist?: string[];
+      };
+      if (payload.sourceStatus === "live" && payload.result) {
+        setAiReviewFlow({
+          draft: reviewSourceText,
+          result: payload.result,
+          riskPoints: payload.riskPoints?.length ? payload.riskPoints : localReviewFlow.riskPoints,
+          rewriteSuggestion: payload.rewriteSuggestion || localReviewFlow.rewriteSuggestion,
+          checklist: payload.checklist?.length ? payload.checklist : localReviewFlow.checklist
+        });
+      } else {
+        setAiReviewFlow(null);
+      }
+    } catch {
+      setAiReviewFlow(null);
+    } finally {
+      setReviewLoading(false);
+    }
   }
 
   function openHotspotWorkflow(hotspot: ReturnType<typeof buildMatchHotspotShortlist>[number]) {
@@ -426,30 +471,6 @@ export default function MatchAnalysisPage() {
       </section>
 
       <section className="rounded-[32px] border bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.06)]" style={{ borderColor: theme.border }}>
-        <SectionTitle eyebrow="TOPIC ENGINE" title="推荐选题" />
-        <div className="mt-6 grid gap-4 lg:grid-cols-3">
-          {topics.map((topic, index) => (
-            <TopicRecommendationCard
-              key={topic.id}
-              topic={topic}
-              theme={theme}
-              featured={index === 0}
-              selected={selectedTopic.id === topic.id}
-              copied={copied === `topic-${topic.id}`}
-              onSelect={() => {
-                setSelectedTopicId(topic.id);
-                setActivePlatform("bilibili");
-                setActiveContentType("topic");
-                setManualDraft(null);
-                setDraftForReview("");
-              }}
-              onCopy={() => handleCopy(`topic-${topic.id}`, formatTopicForCopy(topic))}
-            />
-          ))}
-        </div>
-      </section>
-
-      <section className="rounded-[32px] border bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.06)]" style={{ borderColor: theme.border }}>
         <SectionTitle eyebrow="PLATFORM OUTPUT" title="多平台分发工作台" />
         {workflowNotice ? <p className="mt-3 text-sm font-semibold text-emerald-700">{workflowNotice}</p> : null}
         <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -462,9 +483,9 @@ export default function MatchAnalysisPage() {
               theme={theme}
               onClick={() => {
                 setActivePlatform(platform);
-                setActivePublishGoal(platformDecisions[platform].defaultGoal);
                 setManualDraft(null);
                 setDraftForReview("");
+                setAiReviewFlow(null);
               }}
             />
           ))}
@@ -472,26 +493,29 @@ export default function MatchAnalysisPage() {
         <PlatformPreview
           className="mt-5"
           platform={activePlatform}
-          content={content}
           draft={manualDraft}
-          decision={activePlatformDecision}
-          activeGoal={activePublishGoal}
+          topics={topics}
+          selectedTopicId={selectedTopic.id}
           contentType={activeContentType}
           topicMode={activeTopicMode}
-          onGoalChange={(goal) => {
-            setActivePublishGoal(goal);
+          draftLoading={draftLoading}
+          onTopicChange={(topicId) => {
+            setSelectedTopicId(topicId);
             setManualDraft(null);
             setDraftForReview("");
+            setAiReviewFlow(null);
           }}
           onContentTypeChange={(type) => {
             setActiveContentType(type);
             setManualDraft(null);
             setDraftForReview("");
+            setAiReviewFlow(null);
           }}
           onTopicModeChange={(mode) => {
             setActiveTopicMode(mode);
             setManualDraft(null);
             setDraftForReview("");
+            setAiReviewFlow(null);
           }}
           theme={theme}
           copied={copied}
@@ -516,28 +540,36 @@ export default function MatchAnalysisPage() {
       </section>
 
       <section className="rounded-[32px] border bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.06)]" style={{ borderColor: theme.border }}>
-        <SectionTitle eyebrow="RISK REVIEW" title="发布风险审稿" description="按真实发布流程处理：先看稿件，再审核风险句，最后给可回填的改写版本。" />
+        <SectionTitle eyebrow="RISK REVIEW" title="发布风险审稿" />
         <div className="mt-6 grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="rounded-[28px] border bg-slate-50 p-5" style={{ borderColor: theme.border }}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold" style={{ color: theme.primary }}>待审稿件</div>
-                <p className="mt-1 text-sm text-slate-500">默认读取当前生成稿件，也可以直接粘贴运营准备发布的版本。</p>
               </div>
-              <ActionButton onClick={handleSendToReview} theme={theme} variant="secondary">
-                送入独立审稿页
+              <ActionButton onClick={handleAiReview} theme={theme} variant="secondary">
+                {reviewLoading ? "审核中..." : "AI审核"}
               </ActionButton>
             </div>
             <textarea
               value={reviewSourceText}
-              onChange={(event) => setDraftForReview(event.target.value)}
+              onChange={(event) => {
+                setDraftForReview(event.target.value);
+                setAiReviewFlow(null);
+              }}
               className="mt-4 min-h-64 w-full resize-y rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-7 text-slate-800 outline-none focus:border-emerald-300"
             />
             <div className="mt-4 flex flex-wrap gap-2">
-              <ActionButton onClick={() => setDraftForReview(getPublishableDraftText(activeWorkflowDraft))} theme={theme} variant="secondary">
+              <ActionButton onClick={() => {
+                setDraftForReview(getPublishableDraftText(activeWorkflowDraft));
+                setAiReviewFlow(null);
+              }} theme={theme} variant="secondary">
                 读取当前生成稿件
               </ActionButton>
-              <ActionButton onClick={() => setDraftForReview(reviewFlow.rewriteSuggestion)} theme={theme}>
+              <ActionButton onClick={() => {
+                setDraftForReview(reviewFlow.rewriteSuggestion);
+                setAiReviewFlow(null);
+              }} theme={theme}>
                 应用改写建议
               </ActionButton>
               <ActionButton onClick={() => handleCopy("review-rewrite", reviewFlow.rewriteSuggestion)} theme={theme} variant="secondary">
@@ -586,7 +618,6 @@ export default function MatchAnalysisPage() {
       <section className="flex flex-wrap items-center justify-between gap-4 rounded-[32px] border bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.06)]" style={{ borderColor: theme.border }}>
         <div>
           <h2 className="text-2xl font-semibold text-slate-950">复制 / 导出</h2>
-          <p className="mt-1 text-sm text-slate-500">完成平台预览和风险审稿后，再导出给运营执行。</p>
         </div>
         <div className="flex flex-wrap gap-3">
           <ActionButton onClick={() => handleCopy("all", selectedText)} theme={theme} variant="secondary">
@@ -945,38 +976,6 @@ function compactHotspotLabel(value: string) {
   return value.split(/[\/｜|]/)[0]?.trim() || value;
 }
 
-function TopicRecommendationCard({ topic, theme, featured, selected, copied, onSelect, onCopy }: { topic: TopicIdea; theme: SportTheme; featured?: boolean; selected: boolean; copied: boolean; onSelect: () => void; onCopy: () => void }) {
-  return (
-    <article
-      className={`rounded-[30px] border bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] transition hover:-translate-y-1 ${featured ? "lg:p-6" : ""}`}
-      style={{ borderColor: selected || featured ? theme.primary : theme.border, boxShadow: featured ? `0 26px 80px ${theme.heroGlow}` : undefined }}
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-full px-3 py-1 text-xs font-black text-white" style={{ backgroundColor: featured ? theme.primary : theme.secondary }}>
-          {topic.recommendation}
-        </span>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{topic.category}</span>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">B站优先</span>
-      </div>
-      <h3 className={`${featured ? "text-3xl" : "text-xl"} mt-5 font-semibold leading-tight text-slate-950`}>{topic.title}</h3>
-      <p className="mt-3 text-sm leading-7 text-slate-600">{topic.coreAngle}</p>
-      <div className="mt-5 rounded-2xl border p-4 text-sm leading-6" style={{ borderColor: theme.border, backgroundColor: theme.background }}>
-        <div className="font-semibold" style={{ color: theme.secondary }}>推荐做法</div>
-        <p className="mt-1 text-slate-600">{topic.businessExplanation}</p>
-      </div>
-      <div className="mt-5 grid gap-2 text-sm text-slate-600">
-        <div>内容形式：{topic.recommendedFormat}</div>
-        <div>依据：{topic.reason}</div>
-        <div>制作成本：{topic.productionCost}｜风险等级：{topic.riskLevel}</div>
-      </div>
-      <div className="mt-5 flex flex-wrap gap-2">
-        <ActionButton onClick={onSelect} theme={theme}>{selected ? "已选择" : "选择角度"}</ActionButton>
-        <ActionButton onClick={onCopy} theme={theme} variant="secondary">{copied ? "已复制" : "复制选题"}</ActionButton>
-      </div>
-    </article>
-  );
-}
-
 function PlatformOutputCard({
   platform,
   active,
@@ -1008,15 +1007,6 @@ function PlatformOutputCard({
         <span className="text-3xl font-black" style={{ color: theme.primary }}>{decision.score}</span>
         <span className="mb-1 text-xs font-semibold text-slate-400">适配分</span>
       </div>
-      <p className="mt-3 line-clamp-2 min-h-10 text-sm leading-5 text-slate-600">{decision.reason}</p>
-      <div className="mt-4 flex flex-wrap gap-1.5">
-        <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">
-          {publishGoals[decision.defaultGoal].label}
-        </span>
-        <span className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-white" style={{ backgroundColor: active ? theme.primary : "#0f172a" }}>
-          {meta.action.replace("生成", "")}
-        </span>
-      </div>
     </button>
   );
 }
@@ -1024,13 +1014,13 @@ function PlatformOutputCard({
 function PlatformPreview({
   className,
   platform,
-  content,
   draft,
-  decision,
-  activeGoal,
+  topics,
+  selectedTopicId,
   contentType,
   topicMode,
-  onGoalChange,
+  draftLoading,
+  onTopicChange,
   onContentTypeChange,
   onTopicModeChange,
   theme,
@@ -1041,13 +1031,13 @@ function PlatformPreview({
 }: {
   className?: string;
   platform: PlatformKey;
-  content: PlatformContent;
   draft: PlatformDraft | null;
-  decision: PlatformDecision;
-  activeGoal: PublishGoalKey;
+  topics: TopicIdea[];
+  selectedTopicId: string;
   contentType: ContentTypeKey;
   topicMode: TopicModeKey;
-  onGoalChange: (goal: PublishGoalKey) => void;
+  draftLoading: boolean;
+  onTopicChange: (topicId: string) => void;
   onContentTypeChange: (type: ContentTypeKey) => void;
   onTopicModeChange: (mode: TopicModeKey) => void;
   theme: SportTheme;
@@ -1056,23 +1046,18 @@ function PlatformPreview({
   onExport: () => void;
   onRegenerate: () => void;
 }) {
-  const preview = getPlatformPreview(platform, content);
   const generatedText = draft?.body ?? "";
   return (
     <div className={`rounded-[28px] border bg-white p-5 ${className ?? ""}`} style={{ borderColor: theme.border }}>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="text-sm font-semibold" style={{ color: theme.primary }}>{platformMeta[platform].title}</div>
-          <h3 className="mt-2 text-2xl font-semibold text-slate-950">{draft ? draft.title : `${publishGoals[activeGoal].label} · ${preview.title}`}</h3>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{decision.fit} {decision.score}</span>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{decision.deliverable}</span>
-          </div>
+          {draft ? <h3 className="mt-2 text-2xl font-semibold text-slate-950">{draft.title}</h3> : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <ActionButton onClick={onRegenerate} theme={theme} variant="secondary">
             <RefreshCcw className="h-4 w-4" />
-            {draft ? "重新生成" : platformMeta[platform].action}
+            {draftLoading ? "生成中..." : draft ? "重新生成" : platformMeta[platform].action}
           </ActionButton>
           {draft ? (
             <>
@@ -1088,20 +1073,19 @@ function PlatformPreview({
           ) : null}
         </div>
       </div>
-      <div className="mt-5 flex flex-wrap gap-2">
-        {(Object.keys(publishGoals) as PublishGoalKey[]).map((goal) => (
-          <button
-            key={goal}
-            type="button"
-            onClick={() => onGoalChange(goal)}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition ${activeGoal === goal ? "text-white shadow-sm" : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50"}`}
-            style={activeGoal === goal ? { backgroundColor: theme.primary, boxShadow: `0 10px 24px ${theme.heroGlow}` } : undefined}
+      <div className="mt-5 grid gap-3 md:grid-cols-3">
+        <label className="text-sm font-semibold text-slate-600">
+          选题
+          <select
+            value={selectedTopicId}
+            onChange={(event) => onTopicChange(event.target.value)}
+            className="mt-2 h-11 w-full rounded-2xl border border-emerald-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-emerald-400"
           >
-            {publishGoals[goal].label}
-          </button>
-        ))}
-      </div>
-      <div className="mt-5 grid gap-3 md:grid-cols-2">
+            {topics.map((topic) => (
+              <option key={topic.id} value={topic.id}>{topic.title}</option>
+            ))}
+          </select>
+        </label>
         <label className="text-sm font-semibold text-slate-600">
           内容类型
           <select
@@ -1129,34 +1113,9 @@ function PlatformPreview({
       </div>
       {draft ? (
         <div className="mt-5 whitespace-pre-line rounded-2xl bg-slate-50 p-5 text-sm leading-7 text-slate-700">{generatedText}</div>
-      ) : (
-        <div className="mt-5 grid gap-3 lg:grid-cols-3">
-          <PreviewTile label="交付物" value={decision.deliverable} />
-          <PreviewTile label="注意点" value={decision.caution} />
-          <PreviewTile label={preview.items[0]?.label ?? "素材"} value={preview.items[0]?.value ?? decision.reason} />
-        </div>
-      )}
+      ) : null}
     </div>
   );
-}
-
-function PreviewTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-slate-50 p-4">
-      <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">{label}</div>
-      <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-700">{value}</p>
-    </div>
-  );
-}
-
-function formatTopicForCopy(topic: TopicIdea) {
-  return [
-    `标题：${topic.title}`,
-    `适合平台：${topic.recommendedFormat}`,
-    `核心看点：${topic.coreAngle}`,
-    `推荐表达：${topic.businessExplanation}`,
-    `风险提醒：${topic.riskLevel}风险，${topic.reason}`
-  ].join("\n");
 }
 
 function getPublishableDraftText(draft: PlatformDraft) {
@@ -1185,7 +1144,6 @@ function buildPlatformDecisions(match: MatchData, signals: MatchSignal[], topic:
       fit: scoreToFit(deepScore),
       score: deepScore,
       reason: eventCount >= 3 ? "事件线够完整，适合做复盘。" : "信息偏基础，适合做短复盘。",
-      defaultGoal: "deepReview",
       deliverable: "标题、封面、结构、开头口播",
       caution: "别只剪比分，先补证据。"
     },
@@ -1193,7 +1151,6 @@ function buildPlatformDecisions(match: MatchData, signals: MatchSignal[], topic:
       fit: scoreToFit(weiboScore),
       score: weiboScore,
       reason: goalTotal >= 3 || hasLateEvent ? "有讨论点，适合快速承接。" : "热度一般，适合观点短评。",
-      defaultGoal: hasLateEvent ? "debate" : "quickHot",
       deliverable: "短评、话题、评论区引导",
       caution: "争议表达要留核验口。"
     },
@@ -1201,7 +1158,6 @@ function buildPlatformDecisions(match: MatchData, signals: MatchSignal[], topic:
       fit: scoreToFit(xhsScore),
       score: xhsScore,
       reason: playerCount >= 2 ? "人物和数据都能拆成卡片。" : "适合做基础看球解释。",
-      defaultGoal: playerCount >= 2 ? "playerStory" : "dataRead",
       deliverable: "封面、卡片结构、正文",
       caution: "少用绝对判断，多用解释。"
     },
@@ -1209,7 +1165,6 @@ function buildPlatformDecisions(match: MatchData, signals: MatchSignal[], topic:
       fit: scoreToFit(douyinScore),
       score: douyinScore,
       reason: goalTotal >= 3 || hasLateEvent ? "有短视频钩子。" : "缺少强瞬间，先谨慎。",
-      defaultGoal: goalTotal >= 3 || hasLateEvent ? "quickHot" : "emotionClose",
       deliverable: "3秒钩子、15秒/30秒口播",
       caution: "没有画面版权时用数据卡。"
     },
@@ -1217,29 +1172,9 @@ function buildPlatformDecisions(match: MatchData, signals: MatchSignal[], topic:
       fit: scoreToFit(articleScore),
       score: articleScore,
       reason: match.historicalMeetings.length ? "有历史纵深，适合沉淀。" : "可做赛后长文。",
-      defaultGoal: "deepReview",
       deliverable: "标题、导语、结构、结尾",
       caution: "长文要标清数据来源。"
     }
-  };
-}
-
-function addPublishBrief(draft: PlatformDraft, goal: PublishGoalKey, decision: PlatformDecision): PlatformDraft {
-  const brief = {
-    title: "发布任务",
-    content: [
-      `任务：${publishGoals[goal].label}`,
-      `平台判断：${decision.fit} ${decision.score}`,
-      `交付物：${decision.deliverable}`,
-      `注意点：${decision.caution}`
-    ].join("\n")
-  };
-  const sections = [brief, ...draft.sections];
-  return {
-    ...draft,
-    title: `${publishGoals[goal].label}｜${draft.title}`,
-    sections,
-    body: sections.map((section) => `【${section.title}】\n${section.content}`).join("\n\n")
   };
 }
 
@@ -1257,28 +1192,6 @@ function platformFitTone(fit: PlatformFit, theme: SportTheme) {
   if (fit === "主推") return { backgroundColor: theme.primary, color: "#fff" };
   if (fit === "可做") return { backgroundColor: "#ecfdf5", color: "#047857" };
   return { backgroundColor: "#fff7ed", color: "#c2410c" };
-}
-
-function RiskCard({ title, level, advice, applied, onApply }: { title: string; level: string; advice: string; applied: boolean; onApply: () => void }) {
-  const tone =
-    level === "高"
-      ? "bg-rose-100 text-rose-700"
-      : level === "中"
-        ? "bg-amber-100 text-amber-700"
-        : "bg-emerald-100 text-emerald-700";
-  return (
-    <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-      <div className="flex items-center justify-between gap-2">
-        <div className="font-semibold text-slate-950">{title}</div>
-        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${tone}`}>{level}</span>
-      </div>
-      <p className="mt-3 min-h-24 text-sm leading-6 text-slate-600">{advice}</p>
-      <button onClick={onApply} className="mt-3 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">
-        {applied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <ShieldAlert className="h-3.5 w-3.5" />}
-        {applied ? "已应用" : "稳妥改写"}
-      </button>
-    </div>
-  );
 }
 
 function ActionButton({ children, onClick, theme, variant = "primary" }: { children: ReactNode; onClick: () => void; theme: SportTheme; variant?: "primary" | "secondary" }) {
