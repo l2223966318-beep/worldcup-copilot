@@ -97,7 +97,7 @@ export async function enhanceMatchWorkflowWithDeepSeek(input: {
         role: "user",
         content: JSON.stringify({
           task:
-            "增强 WorldCup Copilot 单场比赛工作流。输出 conclusions 3 条、topics 3 条、platformStrategy 和 platformContent。conclusions 必须分别覆盖：事实摘要、运营判断、风险提醒。topics 必须优先利用 matchSignals 中的乌龙球、球衣被扯破、VAR、争议判罚、冲突、伤病需核验等场上热点信号；没有信号时，再从比分走势、关键球员、技术统计里找角度。不要只围绕比分或控球率。platformContent 必须贴合当前比赛和主推选题，不要套用无关球员或历史样例。",
+            "增强 WorldCup Copilot 单场比赛工作流。输出 conclusions 3 条、topics 6 条、platformStrategy 和 platformContent。conclusions 必须分别覆盖：事实摘要、运营判断、风险提醒。topics 必须优先利用 matchSignals 中的乌龙球、球衣被扯破、VAR、争议判罚、冲突、伤病需核验等场上热点信号；没有信号时，再从比分走势、关键球员、技术统计里找角度。选题不是泛泛角度，而是具体做法，必须覆盖客观资讯、球迷讨论、轻松整活、专业分析，可加入球员故事、数据解读、风险安全版等方向；例如“用动漫角色介绍球星定位”“用一分钟时间线讲清绝杀”“用数据卡拆射正效率”。不要只围绕比分或控球率。platformContent 必须贴合当前比赛和主推选题，不要套用无关球员或历史样例。",
           outputShape: {
             conclusions: [{ title: "事实摘要/运营判断/风险提醒", body: "80字以内，必须具体", featured: false }],
             topics: [
@@ -206,7 +206,7 @@ function normalizeConclusions(conclusions?: DeepSeekWorkflowResponse["conclusion
 
 function normalizeTopics(matchId: string, topics: DeepSeekTopic[] | undefined, fallback: TopicIdea[]) {
   const fallbackTopic = fallback[0];
-  const normalized = (topics ?? []).slice(0, 3).map((topic, index) => {
+  const normalized = (topics ?? []).slice(0, 6).map((topic, index) => {
     const currentFallback = fallback[index] ?? fallbackTopic;
     return {
       id: `${matchId}-deepseek-${index + 1}`,
@@ -232,7 +232,7 @@ function normalizeTopics(matchId: string, topics: DeepSeekTopic[] | undefined, f
     } satisfies TopicIdea;
   });
 
-  return qualityControl(normalized.length ? normalized : fallback.slice(0, 3)) as TopicIdea[];
+  return qualityControl(normalized.length ? normalized : fallback.slice(0, 6)) as TopicIdea[];
 }
 
 function normalizePlatformContent(content: DeepSeekPlatformContent | undefined, fallback: PlatformContent) {

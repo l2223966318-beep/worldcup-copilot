@@ -86,6 +86,38 @@ export function generateTopics(match: MatchData): TopicIdea[] {
           sampleTitles: [`${leadSubject}，为什么值得单独拆？`, `从一组数据看懂${leadSubject}的内容价值`]
         }),
         createTopic(match, {
+          id: "objective-news",
+          title: `${match.name}赛后资讯怎么发才干净`,
+          coreAngle: `把比分 ${match.score}、关键事件、射门射正和数据来源讲清楚，先满足客观资讯需求，再给后续内容留入口。`,
+          category: "平台热点",
+          recommendation: "次推",
+          scores: [82, 76, 80, 82, 74, 86, 76],
+          recommendedFormat: "赛后快讯 + 微博短评 + B站开头事实段",
+          difficulty: "低",
+          productionCost: "低",
+          riskLevel: "低",
+          scoreReason: "事实层清楚，适合做第一波发布，不依赖额外素材。",
+          businessExplanation: "做法是先把已知事实发干净，再把“为什么值得复盘”留给B站长内容。",
+          reason: "依据来自比分、关键事件和基础技术统计，不编造采访或未公开消息。",
+          sampleTitles: [`${match.name}赛后先看这几件事`, `${match.score}之后，先把事实讲清楚`]
+        }),
+        createTopic(match, {
+          id: "playful-anime-role",
+          title: `用动漫角色讲清${leadSubject}`,
+          coreAngle: `把${leadSubject}放进“主角/反派/辅助/转折角色”的轻松框架，再回到真实事件和数据。`,
+          category: "情绪共鸣",
+          recommendation: "观察",
+          scores: [78, 88, 82, 90, 84, 82, 92],
+          recommendedFormat: "B站轻松整活 + 短视频口播",
+          difficulty: "低",
+          productionCost: "低",
+          riskLevel: "低",
+          scoreReason: "形式轻，适合破圈，但必须用事实兜底。",
+          businessExplanation: "这不是恶搞新闻，而是用观众熟悉的动漫角色关系解释球星或球队定位。",
+          reason: `依据来自${leadEvidence}，表达上用角色类比降低理解门槛。`,
+          sampleTitles: [`如果${leadSubject}是动漫角色`, `用动漫角色看懂这场球`]
+        }),
+        createTopic(match, {
           id: "data-anomaly",
           title: "比分之外还有什么数据信号",
           coreAngle: "把射门、射正、角球和关键事件放在一起，解释哪些机会真正改变了比赛。",

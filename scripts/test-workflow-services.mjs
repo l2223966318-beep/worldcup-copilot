@@ -34,7 +34,7 @@ for (const file of files) {
 }
 
 const { createRuleBasedAnalysis } = await import(`file:///${join(outDir, "lib/services/analysisService.mjs").replaceAll("\\", "/")}`);
-const { createPlatformDraft, supportedPlatforms } = await import(`file:///${join(outDir, "lib/services/contentService.mjs").replaceAll("\\", "/")}`);
+const { createPlatformDraft, supportedPlatforms, contentTypeOptions, topicModeOptions } = await import(`file:///${join(outDir, "lib/services/contentService.mjs").replaceAll("\\", "/")}`);
 const { createContentPackage, createPackageMarkdown } = await import(`file:///${join(outDir, "lib/services/exportService.mjs").replaceAll("\\", "/")}`);
 
 const matchContext = {
@@ -75,9 +75,15 @@ assert.ok(analysis.turningPoints.some((item) => item.includes("乌龙球")));
 
 const douyin = createPlatformDraft("douyin", matchContext, topic, analysis);
 const bilibili = createPlatformDraft("bilibili", matchContext, topic, analysis);
+const bilibiliTopic = createPlatformDraft("bilibili", matchContext, topic, analysis, { contentType: "topic", topicMode: "playful" });
 assert.equal(supportedPlatforms.includes("douyin"), true);
+assert.equal(contentTypeOptions[0].key, "topic");
+assert.equal(topicModeOptions.some((item) => item.key === "playful"), true);
 assert.notEqual(douyin.body, bilibili.body);
 assert.ok(douyin.body.includes("可直接发布版"));
+assert.ok(bilibiliTopic.body.includes("选题"));
+assert.ok(bilibiliTopic.body.includes("轻松整活"));
+assert.ok(bilibiliTopic.body.includes("动漫角色"));
 
 const pkg = createContentPackage({
   matchContext,

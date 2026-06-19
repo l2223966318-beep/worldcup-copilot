@@ -26,7 +26,7 @@ import { HOT_RADAR_CACHE_KEY, type HotRadarCache } from "@/lib/hot/hotTopicWorkf
 import type { HotItem, HotSearchPayload, HotTopic } from "@/lib/hot/types";
 import { analyzeMatch, getMatchDetail } from "@/lib/project-api";
 import { createRuleBasedAnalysis } from "@/lib/services/analysisService";
-import { createPlatformDraft } from "@/lib/services/contentService";
+import { contentTypeOptions, createPlatformDraft, topicModeOptions, type ContentTypeKey, type TopicModeKey } from "@/lib/services/contentService";
 import { createContentPackage, createPackageMarkdown, createPackageText } from "@/lib/services/exportService";
 import { localizeMatchStatus, localizeRoundName, localizeTeamName, localizeVenueText } from "@/lib/services/footballNames";
 import { buildDraftReviewFlow, buildMatchHotspotShortlist, mergeHotSearchPayloads } from "@/lib/services/matchDetailPresentation";
@@ -112,7 +112,7 @@ export default function MatchAnalysisPage() {
   const theme = getSportTheme(getMatchSportType(match.id));
   const analysis = useMemo(() => analyzeMatch(match), [match]);
   const matchSignals = useMemo(() => extractMatchSignals(match), [match]);
-  const baselineTopics = useMemo(() => generateTopics(match).slice(0, 3), [match]);
+  const baselineTopics = useMemo(() => generateTopics(match).slice(0, 6), [match]);
   const [aiEnhancement, setAiEnhancement] = useState<AiWorkflowEnhancement | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const topics = aiEnhancement?.sourceStatus === "live" && aiEnhancement.topics.length ? aiEnhancement.topics : baselineTopics;
@@ -121,6 +121,8 @@ export default function MatchAnalysisPage() {
   const workflow = useMemo(() => buildMatchWorkflow(match, topics[0], analysis, aiEnhancement), [aiEnhancement, analysis, match, topics]);
   const [activePlatform, setActivePlatform] = useState<PlatformKey>("bilibili");
   const [activePublishGoal, setActivePublishGoal] = useState<PublishGoalKey>("deepReview");
+  const [activeContentType, setActiveContentType] = useState<ContentTypeKey>("topic");
+  const [activeTopicMode, setActiveTopicMode] = useState<TopicModeKey>("professional");
   const [copied, setCopied] = useState<string | null>(null);
   const [rewriteApplied, setRewriteApplied] = useState<string | null>(null);
   const [manualAnalysis, setManualAnalysis] = useState<AnalysisResult | null>(null);
@@ -149,10 +151,10 @@ export default function MatchAnalysisPage() {
   const platformDecisions = useMemo(() => buildPlatformDecisions(match, matchSignals, selectedTopic), [match, matchSignals, selectedTopic]);
   const activePlatformDecision = platformDecisions[activePlatform];
   const activeWorkflowDraft = useMemo(
-    () => manualDraft ?? addPublishBrief(createPlatformDraft(toWorkflowPlatform(activePlatform), matchContext, workflowTopic, manualAnalysis ?? createRuleBasedAnalysis(matchContext)), activePublishGoal, activePlatformDecision),
-    [activePlatform, activePlatformDecision, activePublishGoal, manualAnalysis, manualDraft, matchContext, workflowTopic]
+    () => manualDraft ?? createPlatformDraft(toWorkflowPlatform(activePlatform), matchContext, workflowTopic, manualAnalysis ?? createRuleBasedAnalysis(matchContext), { contentType: activeContentType, topicMode: activeTopicMode }),
+    [activeContentType, activePlatform, activeTopicMode, manualAnalysis, manualDraft, matchContext, workflowTopic]
   );
-  const reviewSourceText = draftForReview.trim() || activeWorkflowDraft.body;
+  const reviewSourceText = draftForReview.trim() || getPublishableDraftText(activeWorkflowDraft);
   const reviewResult = useMemo(() => reviewRisk(reviewSourceText), [reviewSourceText]);
   const reviewFlow = useMemo(() => buildDraftReviewFlow(reviewSourceText, match, reviewResult), [match, reviewResult, reviewSourceText]);
   const markdown = useMemo(() => buildMarkdown(match.name, selectedTopic, content, reviewFlow.result.advice), [content, match.name, reviewFlow.result.advice, selectedTopic]);
@@ -279,10 +281,10 @@ export default function MatchAnalysisPage() {
 
   function handleGeneratePlatformDraft() {
     const analysisSnapshot = manualAnalysis ?? createRuleBasedAnalysis(matchContext);
-    const draft = addPublishBrief(createPlatformDraft(toWorkflowPlatform(activePlatform), matchContext, workflowTopic, analysisSnapshot), activePublishGoal, activePlatformDecision);
+    const draft = createPlatformDraft(toWorkflowPlatform(activePlatform), matchContext, workflowTopic, analysisSnapshot, { contentType: activeContentType, topicMode: activeTopicMode });
     setManualAnalysis(analysisSnapshot);
     setManualDraft(draft);
-    setDraftForReview(draft.body);
+    setDraftForReview(getPublishableDraftText(draft));
     writeWorkflowState({
       currentMatch: matchContext,
       analysisResult: analysisSnapshot,
@@ -424,6 +426,30 @@ export default function MatchAnalysisPage() {
       </section>
 
       <section className="rounded-[32px] border bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.06)]" style={{ borderColor: theme.border }}>
+        <SectionTitle eyebrow="TOPIC ENGINE" title="推荐选题" />
+        <div className="mt-6 grid gap-4 lg:grid-cols-3">
+          {topics.map((topic, index) => (
+            <TopicRecommendationCard
+              key={topic.id}
+              topic={topic}
+              theme={theme}
+              featured={index === 0}
+              selected={selectedTopic.id === topic.id}
+              copied={copied === `topic-${topic.id}`}
+              onSelect={() => {
+                setSelectedTopicId(topic.id);
+                setActivePlatform("bilibili");
+                setActiveContentType("topic");
+                setManualDraft(null);
+                setDraftForReview("");
+              }}
+              onCopy={() => handleCopy(`topic-${topic.id}`, formatTopicForCopy(topic))}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-[32px] border bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.06)]" style={{ borderColor: theme.border }}>
         <SectionTitle eyebrow="PLATFORM OUTPUT" title="多平台分发工作台" />
         {workflowNotice ? <p className="mt-3 text-sm font-semibold text-emerald-700">{workflowNotice}</p> : null}
         <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -450,8 +476,20 @@ export default function MatchAnalysisPage() {
           draft={manualDraft}
           decision={activePlatformDecision}
           activeGoal={activePublishGoal}
+          contentType={activeContentType}
+          topicMode={activeTopicMode}
           onGoalChange={(goal) => {
             setActivePublishGoal(goal);
+            setManualDraft(null);
+            setDraftForReview("");
+          }}
+          onContentTypeChange={(type) => {
+            setActiveContentType(type);
+            setManualDraft(null);
+            setDraftForReview("");
+          }}
+          onTopicModeChange={(mode) => {
+            setActiveTopicMode(mode);
             setManualDraft(null);
             setDraftForReview("");
           }}
@@ -470,7 +508,7 @@ export default function MatchAnalysisPage() {
               summary: workflowTopic.title,
               sourceStatus: matchContext.matchInfo.sourceStatus
             });
-            downloadTextFile(`${match.id}-${activePlatform}.md`, buildPlatformMarkdown(activePlatform, content), "text/markdown;charset=utf-8");
+            downloadTextFile(`${match.id}-${activePlatform}.md`, activeWorkflowDraft.body, "text/markdown;charset=utf-8");
             showWorkflowNotice(`${platformMeta[activePlatform].title} Markdown 已导出，并写入历史记录。`);
           }}
           onRegenerate={handleGeneratePlatformDraft}
@@ -496,7 +534,7 @@ export default function MatchAnalysisPage() {
               className="mt-4 min-h-64 w-full resize-y rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-7 text-slate-800 outline-none focus:border-emerald-300"
             />
             <div className="mt-4 flex flex-wrap gap-2">
-              <ActionButton onClick={() => setDraftForReview(activeWorkflowDraft.body)} theme={theme} variant="secondary">
+              <ActionButton onClick={() => setDraftForReview(getPublishableDraftText(activeWorkflowDraft))} theme={theme} variant="secondary">
                 读取当前生成稿件
               </ActionButton>
               <ActionButton onClick={() => setDraftForReview(reviewFlow.rewriteSuggestion)} theme={theme}>
@@ -915,19 +953,20 @@ function TopicRecommendationCard({ topic, theme, featured, selected, copied, onS
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className="rounded-full px-3 py-1 text-xs font-black text-white" style={{ backgroundColor: featured ? theme.primary : theme.secondary }}>
-          {featured ? "主推" : "次推"}
+          {topic.recommendation}
         </span>
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{topic.category}</span>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">推荐平台：B站 / 微博</span>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">B站优先</span>
       </div>
       <h3 className={`${featured ? "text-3xl" : "text-xl"} mt-5 font-semibold leading-tight text-slate-950`}>{topic.title}</h3>
-      <p className="mt-3 text-sm leading-7 text-slate-600">{topic.businessExplanation}</p>
+      <p className="mt-3 text-sm leading-7 text-slate-600">{topic.coreAngle}</p>
       <div className="mt-5 rounded-2xl border p-4 text-sm leading-6" style={{ borderColor: theme.border, backgroundColor: theme.background }}>
-        <div className="font-semibold" style={{ color: theme.secondary }}>数据依据</div>
-        <p className="mt-1 text-slate-600">{topic.reason}</p>
+        <div className="font-semibold" style={{ color: theme.secondary }}>推荐做法</div>
+        <p className="mt-1 text-slate-600">{topic.businessExplanation}</p>
       </div>
       <div className="mt-5 grid gap-2 text-sm text-slate-600">
-        <div>可生成产物：B站脚本 / 微博话题 / 小红书图文 / 公众号段落</div>
+        <div>内容形式：{topic.recommendedFormat}</div>
+        <div>依据：{topic.reason}</div>
         <div>制作成本：{topic.productionCost}｜风险等级：{topic.riskLevel}</div>
       </div>
       <div className="mt-5 flex flex-wrap gap-2">
@@ -989,7 +1028,11 @@ function PlatformPreview({
   draft,
   decision,
   activeGoal,
+  contentType,
+  topicMode,
   onGoalChange,
+  onContentTypeChange,
+  onTopicModeChange,
   theme,
   copied,
   onCopy,
@@ -1002,7 +1045,11 @@ function PlatformPreview({
   draft: PlatformDraft | null;
   decision: PlatformDecision;
   activeGoal: PublishGoalKey;
+  contentType: ContentTypeKey;
+  topicMode: TopicModeKey;
   onGoalChange: (goal: PublishGoalKey) => void;
+  onContentTypeChange: (type: ContentTypeKey) => void;
+  onTopicModeChange: (mode: TopicModeKey) => void;
   theme: SportTheme;
   copied: string | null;
   onCopy: (key: string, value: string) => void;
@@ -1054,6 +1101,32 @@ function PlatformPreview({
           </button>
         ))}
       </div>
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
+        <label className="text-sm font-semibold text-slate-600">
+          内容类型
+          <select
+            value={contentType}
+            onChange={(event) => onContentTypeChange(event.target.value as ContentTypeKey)}
+            className="mt-2 h-11 w-full rounded-2xl border border-emerald-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-emerald-400"
+          >
+            {contentTypeOptions.map((item) => (
+              <option key={item.key} value={item.key}>{item.label}</option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm font-semibold text-slate-600">
+          选题方向
+          <select
+            value={topicMode}
+            onChange={(event) => onTopicModeChange(event.target.value as TopicModeKey)}
+            className="mt-2 h-11 w-full rounded-2xl border border-emerald-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-emerald-400"
+          >
+            {topicModeOptions.map((item) => (
+              <option key={item.key} value={item.key}>{item.label}</option>
+            ))}
+          </select>
+        </label>
+      </div>
       {draft ? (
         <div className="mt-5 whitespace-pre-line rounded-2xl bg-slate-50 p-5 text-sm leading-7 text-slate-700">{generatedText}</div>
       ) : (
@@ -1074,6 +1147,20 @@ function PreviewTile({ label, value }: { label: string; value: string }) {
       <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-700">{value}</p>
     </div>
   );
+}
+
+function formatTopicForCopy(topic: TopicIdea) {
+  return [
+    `标题：${topic.title}`,
+    `适合平台：${topic.recommendedFormat}`,
+    `核心看点：${topic.coreAngle}`,
+    `推荐表达：${topic.businessExplanation}`,
+    `风险提醒：${topic.riskLevel}风险，${topic.reason}`
+  ].join("\n");
+}
+
+function getPublishableDraftText(draft: PlatformDraft) {
+  return draft.sections.find((section) => section.title.includes("可直接发布"))?.content ?? draft.body;
 }
 
 function buildPlatformDecisions(match: MatchData, signals: MatchSignal[], topic: TopicIdea): Record<PlatformKey, PlatformDecision> {
