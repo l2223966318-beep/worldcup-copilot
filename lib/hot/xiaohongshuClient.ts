@@ -9,9 +9,17 @@ const DEFAULT_QUERIES = [
   "小红书 世界杯 足球 热点"
 ];
 
-export async function fetchXiaohongshuHotItems(limit: number): Promise<{ items: HotItem[]; message?: string }> {
-  const configuredUrl = process.env.XHS_HOT_API_URL?.trim();
-  const configuredKey = process.env.XHS_HOT_API_KEY?.trim();
+export async function fetchXiaohongshuHotItems(
+  limit: number,
+  options: {
+    apiUrl?: string;
+    apiKey?: string;
+    tavilyApiKey?: string;
+    queries?: string[];
+  } = {}
+): Promise<{ items: HotItem[]; message?: string }> {
+  const configuredUrl = options.apiUrl?.trim() || process.env.XHS_HOT_API_URL?.trim();
+  const configuredKey = options.apiKey?.trim() || process.env.XHS_HOT_API_KEY?.trim();
 
   if (configuredUrl) {
     try {
@@ -23,13 +31,14 @@ export async function fetchXiaohongshuHotItems(limit: number): Promise<{ items: 
     }
   }
 
-  const tavilyKey = process.env.TAVILY_API_KEY?.trim();
+  const tavilyKey = options.tavilyApiKey?.trim() || process.env.TAVILY_API_KEY?.trim();
   if (!tavilyKey) {
     return { items: [], message: "暂未配置小红书热点源：未设置 XHS_HOT_API_URL，也未配置 Tavily 搜索密钥。" };
   }
 
+  const queries = options.queries?.length ? options.queries : DEFAULT_QUERIES;
   const results: HotItem[] = [];
-  for (const query of DEFAULT_QUERIES) {
+  for (const query of queries) {
     try {
       const response = await fetchTavilySearch(query, tavilyKey);
       if (!response.ok) continue;

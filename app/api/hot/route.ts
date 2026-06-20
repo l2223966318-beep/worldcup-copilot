@@ -61,14 +61,19 @@ export async function GET(request: Request) {
   const apiKey = process.env.UAPIPRO_API_KEY?.trim();
   const baseUrl = process.env.UAPIPRO_BASE_URL?.trim();
   const endpoint = process.env.UAPIPRO_HOT_ENDPOINT?.trim();
-  const cacheKey = `hot:${source}:${scope}:${limit}:${baseUrl ?? ""}:${endpoint ?? ""}`;
+  const clientXhs = readClientXhsConfig(request);
+  const clientTavilyKey = readClientApiKey(request, "x-worldcup-tavily-key");
+  const cacheKey = `hot:${source}:${scope}:${limit}:${baseUrl ?? ""}:${endpoint ?? ""}:${clientXhs.cacheKey}:${Boolean(clientTavilyKey)}`;
 
   const cached = hotCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return NextResponse.json({ ...cached.payload, sourceStatus: "cache" });
   }
 
-  if (!baseUrl || !endpoint) {
+  const hotTypes = getRequestedTypes(source);
+  const canUseXhsOnly = hotTypes.includes("xiaohongshu") && (clientXhs.apiUrl || clientXhs.apiKey || clientTavilyKey || process.env.XHS_HOT_API_URL || process.env.TAVILY_API_KEY);
+
+  if ((!baseUrl || !endpoint) && !canUseXhsOnly) {
     if (useMock) {
       return NextResponse.json(createPayload("fallback", createMockItems(limit), MESSAGE.mockUnconfigured));
     }
@@ -76,14 +81,20 @@ export async function GET(request: Request) {
   }
 
   try {
-    const hotTypes = getRequestedTypes(source);
-    const settled = await Promise.allSettled(
-      hotTypes.map((type) =>
-        type === "xiaohongshu"
-          ? fetchXiaohongshuHotItems(requestLimit)
-          : fetchUApiHotItems({ apiKey, baseUrl, endpoint, type, limit: requestLimit }).then((items): HotFetchResult => ({ items }))
-      )
-    );
+    const tasks: Array<Promise<HotFetchResult>> = hotTypes.map((type) => {
+      if (type === "xiaohongshu") {
+        return fetchXiaohongshuHotItems(requestLimit, {
+          apiUrl: clientXhs.apiUrl,
+          apiKey: clientXhs.apiKey,
+          tavilyApiKey: clientTavilyKey,
+          queries: clientXhs.queries
+        });
+      }
+
+      if (!baseUrl || !endpoint) return Promise.resolve({ items: [] });
+      return fetchUApiHotItems({ apiKey, baseUrl, endpoint, type, limit: requestLimit }).then((items): HotFetchResult => ({ items }));
+    });
+    const settled = await Promise.allSettled(tasks);
     const failures = settled.filter((result) => result.status === "rejected");
     const messages = settled.flatMap((result) => (result.status === "fulfilled" && result.value.message ? [result.value.message] : []));
     const items = settled
@@ -168,6 +179,31 @@ function buildUApiHeaders(apiKey?: string) {
     headers["x-api-key"] = apiKey;
   }
   return headers;
+}
+
+function readClientApiKey(request: Request, headerName: string) {
+  const value = request.headers.get(headerName)?.trim();
+  return value || undefined;
+}
+
+function readClientXhsConfig(request: Request) {
+  const apiUrl = request.headers.get("x-worldcup-xhs-url")?.trim() || undefined;
+  const apiKey = request.headers.get("x-worldcup-xhs-key")?.trim() || undefined;
+  const rawQueries = request.headers.get("x-worldcup-xhs-queries")?.trim();
+  const queries = rawQueries
+    ? decodeURIComponent(rawQueries)
+        .split(/\n|,/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .slice(0, 5)
+    : undefined;
+
+  return {
+    apiUrl,
+    apiKey,
+    queries,
+    cacheKey: `${apiUrl ?? ""}:${Boolean(apiKey)}:${queries?.join("|") ?? ""}`
+  };
 }
 
 function buildUApiUrl(baseUrl: string, endpoint: string, type: string, limit: number) {

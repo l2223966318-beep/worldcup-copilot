@@ -66,7 +66,10 @@ export function HotTopicRadarPanel({
     setError("");
 
     try {
-      const response = await fetch("/api/hot?source=all&scope=sports&limit=20", { cache: "no-store" });
+      const response = await fetch("/api/hot?source=all&scope=sports&limit=20", {
+        cache: "no-store",
+        headers: getStoredHotSourceHeaders()
+      });
       const payload = (await response.json().catch(() => null)) as HotSearchPayload | null;
       if (!response.ok) throw new Error(payload?.message || `热点 API 请求失败：${response.status}`);
       if (!payload) throw new Error("热点 API 返回格式不可读取。");
@@ -248,6 +251,23 @@ function readCache(): HotRadarCache | null {
 function writeCache(cache: HotRadarCache) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(HOT_RADAR_CACHE_KEY, JSON.stringify(cache));
+}
+
+function getStoredHotSourceHeaders() {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem("worldcup.datasource.settings");
+    const settings = raw ? (JSON.parse(raw) as { tavilyKey?: string; topHubDataKey?: string; xhsHotUrl?: string; xhsHotKey?: string; xhsHotQueries?: string }) : null;
+    const headers: Record<string, string> = {};
+    if (settings?.tavilyKey?.trim()) headers["x-worldcup-tavily-key"] = settings.tavilyKey.trim();
+    if (settings?.topHubDataKey?.trim()) headers["x-worldcup-tophubdata-key"] = settings.topHubDataKey.trim();
+    if (settings?.xhsHotUrl?.trim()) headers["x-worldcup-xhs-url"] = settings.xhsHotUrl.trim();
+    if (settings?.xhsHotKey?.trim()) headers["x-worldcup-xhs-key"] = settings.xhsHotKey.trim();
+    if (settings?.xhsHotQueries?.trim()) headers["x-worldcup-xhs-queries"] = encodeURIComponent(settings.xhsHotQueries.trim());
+    return headers;
+  } catch {
+    return {};
+  }
 }
 
 function normalizeHotTopics(items: HotItem[], matches: WorldCupMatch[], updatedAt: string): HotTopic[] {

@@ -190,7 +190,7 @@ export default function MatchAnalysisPage() {
     setHotspotError("");
 
     Promise.allSettled([
-      fetchHotPayload("/api/hot?source=all&scope=sports&limit=50", controller.signal),
+      fetchHotPayload("/api/hot?source=all&scope=sports&limit=50", controller.signal, getStoredHotSearchHeaders()),
       fetchHotPayload(`/api/hot/search?q=${encodeURIComponent(query)}`, controller.signal, getStoredHotSearchHeaders())
     ])
       .then((results) => {
@@ -1420,10 +1420,13 @@ function getStoredHotSearchHeaders() {
   if (typeof window === "undefined") return {};
   try {
     const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY);
-    const settings = raw ? (JSON.parse(raw) as { tavilyKey?: string; topHubDataKey?: string }) : null;
+    const settings = raw ? (JSON.parse(raw) as { tavilyKey?: string; topHubDataKey?: string; xhsHotUrl?: string; xhsHotKey?: string; xhsHotQueries?: string }) : null;
     const headers: Record<string, string> = {};
     if (settings?.tavilyKey?.trim()) headers["x-worldcup-tavily-key"] = settings.tavilyKey.trim();
     if (settings?.topHubDataKey?.trim()) headers["x-worldcup-tophubdata-key"] = settings.topHubDataKey.trim();
+    if (settings?.xhsHotUrl?.trim()) headers["x-worldcup-xhs-url"] = settings.xhsHotUrl.trim();
+    if (settings?.xhsHotKey?.trim()) headers["x-worldcup-xhs-key"] = settings.xhsHotKey.trim();
+    if (settings?.xhsHotQueries?.trim()) headers["x-worldcup-xhs-queries"] = encodeURIComponent(settings.xhsHotQueries.trim());
     return headers;
   } catch {
     return {};

@@ -201,9 +201,12 @@ function readHotSourceHeaders() {
   try {
     const raw = window.localStorage.getItem("worldcup.datasource.settings");
     if (!raw) return headers;
-    const settings = JSON.parse(raw) as { tavilyKey?: string; topHubDataKey?: string };
+    const settings = JSON.parse(raw) as { tavilyKey?: string; topHubDataKey?: string; xhsHotUrl?: string; xhsHotKey?: string; xhsHotQueries?: string };
     if (settings.tavilyKey?.trim()) headers["x-worldcup-tavily-key"] = settings.tavilyKey.trim();
     if (settings.topHubDataKey?.trim()) headers["x-worldcup-tophubdata-key"] = settings.topHubDataKey.trim();
+    if (settings.xhsHotUrl?.trim()) headers["x-worldcup-xhs-url"] = settings.xhsHotUrl.trim();
+    if (settings.xhsHotKey?.trim()) headers["x-worldcup-xhs-key"] = settings.xhsHotKey.trim();
+    if (settings.xhsHotQueries?.trim()) headers["x-worldcup-xhs-queries"] = encodeURIComponent(settings.xhsHotQueries.trim());
   } catch {
     return headers;
   }

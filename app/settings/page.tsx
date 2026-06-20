@@ -3,11 +3,14 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, Loader2, PlugZap, Save, XCircle } from "lucide-react";
 
-type SourceKey = "tavily" | "topHubData" | "deepseek" | "openai";
+type SourceKey = "tavily" | "topHubData" | "xiaohongshu" | "deepseek" | "openai";
 
 type SettingsState = {
   tavilyKey: string;
   topHubDataKey: string;
+  xhsHotUrl: string;
+  xhsHotKey: string;
+  xhsHotQueries: string;
   deepseekKey: string;
   openaiKey: string;
   manualHotSignals: string;
@@ -19,6 +22,7 @@ const STORAGE_KEY = "worldcup.datasource.settings";
 const sourceRows: Array<{ key: SourceKey; label: string; field: keyof SettingsState; hint: string }> = [
   { key: "tavily", label: "Tavily", field: "tavilyKey", hint: "用于全网热点搜索和事件补充。" },
   { key: "topHubData", label: "今日热榜 / 榜眼数据", field: "topHubDataKey", hint: "用于接入微博、抖音、B站等热榜数据源。" },
+  { key: "xiaohongshu", label: "小红书热点源", field: "xhsHotKey", hint: "优先读取自定义小红书热点接口；未填接口时可复用 Tavily 做公开搜索。" },
   { key: "deepseek", label: "DeepSeek", field: "deepseekKey", hint: "用于赛事分析、选题和内容生成增强。" },
   { key: "openai", label: "OpenAI", field: "openaiKey", hint: "可作为 DeepSeek 之外的模型配置空间。" }
 ];
@@ -26,6 +30,9 @@ const sourceRows: Array<{ key: SourceKey; label: string; field: keyof SettingsSt
 const defaultSettings: SettingsState = {
   tavilyKey: "",
   topHubDataKey: "",
+  xhsHotUrl: "",
+  xhsHotKey: "",
+  xhsHotQueries: "site:xiaohongshu.com 世界杯 足球 热点\nsite:xiaohongshu.com 世界杯 看球\n小红书 世界杯 足球 热点",
   deepseekKey: "",
   openaiKey: "",
   manualHotSignals: "美国队乌龙球\n韩国球员球衣被扯破\nVAR 判罚争议",
@@ -71,7 +78,13 @@ export default function SettingsPage() {
       const response = await fetch("/api/settings/test-source", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: row.key, apiKey })
+        body: JSON.stringify({
+          source: row.key,
+          apiKey,
+          sourceUrl: row.key === "xiaohongshu" ? settings.xhsHotUrl : undefined,
+          queries: row.key === "xiaohongshu" ? settings.xhsHotQueries : undefined,
+          tavilyKey: row.key === "xiaohongshu" ? settings.tavilyKey : undefined
+        })
       });
       const result = (await response.json()) as { ok: boolean; message: string; mode?: string };
       const savedResult = result.ok ? { ...result, message: `${result.message} 已自动保存，可直接回首页搜索。` } : result;
@@ -109,7 +122,7 @@ export default function SettingsPage() {
                 <StatusPill status={status} />
               </div>
               <label className="mt-4 block">
-                <span className="text-xs font-semibold text-slate-500">API Key</span>
+                <span className="text-xs font-semibold text-slate-500">{row.key === "xiaohongshu" ? "接口 Key（可选）" : "API Key"}</span>
                 <input
                   type="password"
                   value={String(settings[row.field] ?? "")}
@@ -118,6 +131,27 @@ export default function SettingsPage() {
                   className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-800 outline-none focus:border-emerald-300 focus:bg-white"
                 />
               </label>
+              {row.key === "xiaohongshu" ? (
+                <div className="mt-3 space-y-3">
+                  <label className="block">
+                    <span className="text-xs font-semibold text-slate-500">小红书热点接口 URL（可选）</span>
+                    <input
+                      value={settings.xhsHotUrl}
+                      onChange={(event) => updateField("xhsHotUrl", event.target.value)}
+                      placeholder="例如：https://example.com/xhs-hot"
+                      className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-800 outline-none focus:border-emerald-300 focus:bg-white"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-semibold text-slate-500">公开搜索词（无接口时使用 Tavily）</span>
+                    <textarea
+                      value={settings.xhsHotQueries}
+                      onChange={(event) => updateField("xhsHotQueries", event.target.value)}
+                      className="mt-2 min-h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-800 outline-none focus:border-emerald-300 focus:bg-white"
+                    />
+                  </label>
+                </div>
+              ) : null}
               {status ? <p className="mt-3 text-sm text-slate-600">{status.message}</p> : null}
               <button
                 type="button"
