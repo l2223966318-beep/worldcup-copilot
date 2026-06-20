@@ -421,7 +421,7 @@ export default function MatchAnalysisPage() {
         sourceStatus={payload?.sourceStatus ?? "fallback"}
         lastUpdated={payload?.lastUpdated}
         loading={loading}
-        error={error}
+        error={error || formatSourceIssue(payload?.message)}
       />
 
       <AiBrainStatus loading={aiLoading} enhancement={aiEnhancement} theme={theme} />
@@ -1554,10 +1554,19 @@ function matchRefreshPolicy(payload: WorldCupPayload<WorldCupMatch>) {
 
 function sourceLabel(status: SourceStatus, provider?: WorldCupMatch["source"]["provider"]) {
   const providerName = providerSourceName(provider);
+  if (provider === "thestatsapi-fixtures" && status === "live") return "TheStatsAPI 兜底数据";
+  if (provider === "thestatsapi-fixtures" && status === "cache") return "TheStatsAPI 兜底缓存";
   if (status === "live") return providerName ? `${providerName} 实时数据` : "真实 API 数据";
   if (status === "cache") return providerName ? `${providerName} 缓存数据` : "缓存数据";
   if (status === "fallback") return "示例数据";
   return "请求失败";
+}
+
+function formatSourceIssue(message?: string) {
+  if (!message) return "";
+  if (/429|limit exceeded/i.test(message)) return "Sportradar 当前限流，已切换兜底源";
+  if (/sportradar/i.test(message)) return "Sportradar 暂不可用，已切换兜底源";
+  return message;
 }
 
 function providerSourceName(provider?: WorldCupMatch["source"]["provider"]) {

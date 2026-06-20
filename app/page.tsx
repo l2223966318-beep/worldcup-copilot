@@ -47,6 +47,7 @@ export default function DashboardPage() {
   const competitions = Array.from(new Set(matches.map((item) => item.competition))).filter(Boolean);
   const activePayload = useFullFixturePool ? allPayload : payload;
   const activeStatus = activePayload?.sourceStatus ?? "fallback";
+  const sourceIssue = formatSourceIssue(activePayload?.message);
   const hasFilters = Boolean(matchSearchQuery.trim() || dateFilter || statusFilter !== "all" || competitionFilter !== "all");
   const isMockMode = activeStatus === "fallback";
   const isNoDataState = !loading && !error && !hasFilters && filteredMatches.length === 0;
@@ -100,7 +101,7 @@ export default function DashboardPage() {
                 provider={readPayloadProvider(activePayload?.data)}
                 lastUpdated={activePayload?.lastUpdated}
                 loading={loading || (useFullFixturePool && allLoading)}
-                error={error}
+                error={error || sourceIssue}
               />
             </div>
             <div className="mt-5 grid gap-3 rounded-[24px] border border-slate-200 bg-white p-4 md:grid-cols-4">
@@ -674,10 +675,19 @@ function dedupeSignals(signals: string[]) {
 
 function sourceLabel(status: SourceStatus, provider?: WorldCupMatch["source"]["provider"]) {
   const providerName = providerSourceName(provider);
+  if (provider === "thestatsapi-fixtures" && status === "live") return "TheStatsAPI 兜底数据";
+  if (provider === "thestatsapi-fixtures" && status === "cache") return "TheStatsAPI 兜底缓存";
   if (status === "live") return providerName ? `${providerName} 实时数据` : "真实接口数据";
   if (status === "cache") return providerName ? `${providerName} 缓存数据` : "缓存数据";
   if (status === "fallback") return "示例数据";
   return "请求失败";
+}
+
+function formatSourceIssue(message?: string) {
+  if (!message) return "";
+  if (/429|limit exceeded/i.test(message)) return "Sportradar 当前限流，已切换兜底源";
+  if (/sportradar/i.test(message)) return "Sportradar 暂不可用，已切换兜底源";
+  return message;
 }
 
 function providerSourceName(provider?: WorldCupMatch["source"]["provider"]) {

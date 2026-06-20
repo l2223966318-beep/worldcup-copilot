@@ -28,8 +28,9 @@ import {
 import { getBeijingDateKey } from "@/lib/time/beijingTime";
 
 const FIXTURE_CACHE_TTL_MS = 10 * 60_000;
-const ACTIVE_CACHE_TTL_MS = 60_000;
-const ERROR_CACHE_TTL_MS = 30_000;
+const ACTIVE_CACHE_TTL_MS = 10 * 60_000;
+const LIVE_CACHE_TTL_MS = 2 * 60_000;
+const ERROR_CACHE_TTL_MS = 2 * 60_000;
 
 type CacheEntry<T> = {
   expiresAt: number;
@@ -76,7 +77,7 @@ export async function getTodayWorldCupFixtures(date = getTodayDate()) {
 export async function getLiveWorldCupFixtures() {
   return cachedFirstAvailable(
     "worldcup-fixtures-live",
-    20_000,
+    LIVE_CACHE_TTL_MS,
     [
       {
         enabled: hasSportradarKey(),
@@ -143,9 +144,11 @@ async function cachedFirstAvailable<T>(
     try {
       const payload = await source.load();
       if (payload.sourceStatus === "live" || payload.sourceStatus === "fallback") {
-        cache.set(key, { expiresAt: now + ttlMs, payload });
+        const resolvedPayload = lastMessage ? withFallbackMessage(payload, lastMessage) : payload;
+        cache.set(key, { expiresAt: now + ttlMs, payload: resolvedPayload });
+        return resolvedPayload;
       }
-      return payload;
+      return lastMessage ? withFallbackMessage(payload, lastMessage) : payload;
     } catch (error) {
       lastMessage = error instanceof Error ? error.message : "Unknown World Cup data source error.";
       if (process.env.NODE_ENV !== "production") {
@@ -168,6 +171,15 @@ async function cachedFirstAvailable<T>(
 
 function fallbackList(message?: string): WorldCupPayload<WorldCupMatch[]> {
   return createPayload("fallback", getFallbackMatches(), message);
+}
+
+function withFallbackMessage<T>(payload: WorldCupPayload<T>, upstreamMessage: string): WorldCupPayload<T> {
+  return {
+    ...payload,
+    message: payload.message
+      ? `${upstreamMessage}；${payload.message}`
+      : upstreamMessage
+  };
 }
 
 async function requireNonEmpty<T>(
