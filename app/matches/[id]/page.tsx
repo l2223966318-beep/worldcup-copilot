@@ -12,6 +12,7 @@ import {
   RefreshCcw
 } from "lucide-react";
 
+import { HighlightedText, ReadableTextBlock } from "@/components/ui/readable-text";
 import { InsightCharts } from "@/components/worldcup/insight-charts";
 import type { MatchData } from "@/data/matches";
 import { generatePlatformContent, type PlatformContent } from "@/lib/ai/content";
@@ -590,15 +591,15 @@ export default function MatchAnalysisPage() {
               <h3 className="mt-4 text-xl font-semibold text-slate-950">审核结果</h3>
               <div className="mt-4 space-y-3">
                 {reviewFlow.riskPoints.map((item) => (
-                  <div key={item} className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">{item}</div>
+                  <div key={item} className="rounded-2xl bg-slate-50 p-4">
+                    <ReadableTextBlock text={item} />
+                  </div>
                 ))}
               </div>
             </div>
             <div className="rounded-[28px] border bg-white p-5" style={{ borderColor: theme.border }}>
               <h3 className="text-xl font-semibold text-slate-950">改写建议</h3>
-              <p className="mt-3 whitespace-pre-line rounded-2xl p-4 text-sm leading-7 text-slate-700" style={{ backgroundColor: theme.background }}>
-                {reviewFlow.rewriteSuggestion}
-              </p>
+              <ReadableTextBlock text={reviewFlow.rewriteSuggestion} className="mt-3 rounded-2xl bg-emerald-50/60 p-4" />
             </div>
             <div className="rounded-[28px] border bg-white p-5" style={{ borderColor: theme.border }}>
               <h3 className="text-xl font-semibold text-slate-950">发布前检查</h3>
@@ -606,7 +607,7 @@ export default function MatchAnalysisPage() {
                 {reviewFlow.checklist.map((item) => (
                   <div key={item} className="flex gap-2 text-sm leading-6 text-slate-600">
                     <Check className="mt-1 h-4 w-4 shrink-0 text-emerald-600" />
-                    <span>{item}</span>
+                    <span className="leading-relaxed text-slate-700"><HighlightedText text={item} /></span>
                   </div>
                 ))}
               </div>
@@ -852,7 +853,7 @@ function ConclusionCard({ title, body, theme, featured = false }: { title: strin
       style={{ borderColor: featured ? theme.primary : theme.border, boxShadow: featured ? `0 24px 70px ${theme.heroGlow}` : undefined }}
     >
       <div className="text-sm font-semibold" style={{ color: theme.primary }}>{title}</div>
-      <p className="mt-3 text-lg font-semibold leading-8 text-slate-950">{body}</p>
+      <p className="mt-3 text-sm font-medium leading-relaxed text-slate-700"><HighlightedText text={body} /></p>
     </div>
   );
 }
@@ -863,9 +864,9 @@ function DataAngleCard({ label, value, compare, explain, angle, theme }: { label
       <div className="text-sm font-semibold text-slate-500">{label}</div>
       <div className="mt-3 text-4xl font-black tracking-tight" style={{ color: theme.strongText }}>{value}</div>
       <div className="mt-1 text-sm font-semibold" style={{ color: theme.primary }}>{compare}</div>
-      <p className="mt-4 text-sm leading-6 text-slate-600">{explain}</p>
-      <div className="mt-4 rounded-2xl p-3 text-sm font-medium leading-6" style={{ backgroundColor: theme.background, color: theme.secondary }}>
-        内容转化：{angle}
+      <p className="mt-4 text-sm leading-relaxed text-slate-700"><HighlightedText text={explain} /></p>
+      <div className="mt-4 rounded-2xl p-3 text-sm font-medium leading-relaxed" style={{ backgroundColor: theme.background, color: theme.secondary }}>
+        内容转化：<HighlightedText text={angle} />
       </div>
     </div>
   );
@@ -990,21 +991,20 @@ function PlatformOutputCard({
   onClick: () => void;
 }) {
   const meta = platformMeta[platform];
-  const fitTone = platformFitTone(decision.fit, theme);
+  const tone = platformCardTone(platform, decision.fit, active);
   return (
     <button
       onClick={onClick}
-      className="rounded-[26px] border bg-white p-4 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-[0_20px_56px_rgba(15,23,42,0.08)]"
-      style={{ borderColor: active ? theme.primary : theme.border, backgroundColor: active ? theme.background : "#fff" }}
+      className={`rounded-[26px] border p-4 text-left transition hover:-translate-y-1 hover:shadow-[0_20px_56px_rgba(15,23,42,0.08)] ${tone.card}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="text-xl font-semibold text-slate-950">{meta.title}</div>
-        <span className="rounded-full px-2.5 py-1 text-xs font-black" style={fitTone}>
+        <span className={`rounded-full px-2.5 py-1 text-xs font-black ${tone.badge}`}>
           {decision.fit}
         </span>
       </div>
       <div className="mt-3 flex items-end gap-2">
-        <span className="text-3xl font-black" style={{ color: theme.primary }}>{decision.score}</span>
+        <span className={`text-3xl font-black ${tone.score}`}>{decision.score}</span>
         <span className="mb-1 text-xs font-semibold text-slate-400">适配分</span>
       </div>
     </button>
@@ -1112,7 +1112,7 @@ function PlatformPreview({
         </label>
       </div>
       {draft ? (
-        <div className="mt-5 whitespace-pre-line rounded-2xl bg-slate-50 p-5 text-sm leading-7 text-slate-700">{generatedText}</div>
+        <ReadableTextBlock text={generatedText} className="mt-5 rounded-2xl bg-slate-50 p-5" />
       ) : null}
     </div>
   );
@@ -1188,10 +1188,60 @@ function clampPlatformScore(score: number) {
   return Math.max(45, Math.min(96, score));
 }
 
-function platformFitTone(fit: PlatformFit, theme: SportTheme) {
-  if (fit === "主推") return { backgroundColor: theme.primary, color: "#fff" };
-  if (fit === "可做") return { backgroundColor: "#ecfdf5", color: "#047857" };
-  return { backgroundColor: "#fff7ed", color: "#c2410c" };
+const promotedPlatformTone: Record<PlatformKey, { card: string; badge: string; score: string }> = {
+  bilibili: {
+    card: "border-pink-200/60 bg-gradient-to-b from-pink-50/70 to-white shadow-sm",
+    badge: "bg-pink-50 text-pink-700 ring-1 ring-pink-200/70",
+    score: "text-pink-600"
+  },
+  weibo: {
+    card: "border-orange-200/60 bg-gradient-to-b from-orange-50/70 to-white shadow-sm",
+    badge: "bg-orange-50 text-orange-700 ring-1 ring-orange-200/70",
+    score: "text-orange-600"
+  },
+  xiaohongshu: {
+    card: "border-rose-200/60 bg-gradient-to-b from-rose-50/70 to-white shadow-sm",
+    badge: "bg-rose-50 text-rose-700 ring-1 ring-rose-200/70",
+    score: "text-rose-600"
+  },
+  douyin: {
+    card: "border-cyan-200/60 bg-gradient-to-b from-cyan-50/70 to-white shadow-sm",
+    badge: "bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200/70",
+    score: "text-cyan-600"
+  },
+  article: {
+    card: "border-emerald-200/70 bg-gradient-to-b from-emerald-50/80 to-white shadow-sm",
+    badge: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/80",
+    score: "text-emerald-700"
+  }
+};
+
+function platformCardTone(platform: PlatformKey, fit: PlatformFit, active: boolean) {
+  const activeRing = active ? "ring-2 ring-emerald-200/80" : "";
+
+  // 主推卡片按平台品牌色提升权重；可做卡片保持后退，避免全部抢视觉。
+  if (fit === "主推") {
+    const tone = promotedPlatformTone[platform];
+    return {
+      card: `${tone.card} ${activeRing}`,
+      badge: tone.badge,
+      score: tone.score
+    };
+  }
+
+  if (fit === "可做") {
+    return {
+      card: `border-slate-100 bg-white shadow-[0_1px_0_rgba(15,23,42,0.03)] ${activeRing}`,
+      badge: "bg-slate-50 text-slate-500 ring-1 ring-slate-200/80",
+      score: "text-slate-700"
+    };
+  }
+
+  return {
+    card: `border-amber-100 bg-white shadow-[0_1px_0_rgba(15,23,42,0.03)] ${activeRing}`,
+    badge: "bg-amber-50 text-amber-700 ring-1 ring-amber-200/70",
+    score: "text-amber-700"
+  };
 }
 
 function ActionButton({ children, onClick, theme, variant = "primary" }: { children: ReactNode; onClick: () => void; theme: SportTheme; variant?: "primary" | "secondary" }) {

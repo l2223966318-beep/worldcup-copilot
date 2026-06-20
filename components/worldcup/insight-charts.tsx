@@ -22,6 +22,7 @@ import {
 
 import type { MatchData } from "@/data/matches";
 import { copyToClipboard } from "@/lib/download";
+import { HighlightedText } from "@/components/ui/readable-text";
 import { buildChartCopy, buildTeamRadarData } from "@/lib/services/matchDetailPresentation";
 import { getSportTheme, type SportTheme } from "@/lib/sport-theme";
 
@@ -50,12 +51,27 @@ export function InsightCharts({ match, theme = getSportTheme("football") }: { ma
         theme={theme}
       >
         <ResponsiveContainer width="100%" height={250}>
-          <BarChart data={possessionData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,.22)" />
-            <XAxis dataKey="team" stroke="#64748b" />
-            <YAxis stroke="#64748b" />
+          <BarChart data={possessionData} barCategoryGap="44%" margin={{ top: 10, right: 8, left: -12, bottom: 0 }}>
+            <defs>
+              <linearGradient id="possessionGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#34d399" />
+                <stop offset="100%" stopColor="#059669" />
+              </linearGradient>
+            </defs>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#E2E8F0" opacity={0.4} />
+            <XAxis
+              dataKey="team"
+              axisLine={{ stroke: "#CBD5E1", strokeWidth: 1 }}
+              tickLine={false}
+              tick={{ fill: "#94A3B8", fontSize: 12, fontFamily: "inherit" }}
+            />
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: "#94A3B8", fontSize: 12, fontFamily: "inherit" }}
+            />
             <Tooltip />
-            <Bar dataKey="value" fill={theme.chartA} radius={[10, 10, 0, 0]} />
+            <Bar dataKey="value" fill="url(#possessionGradient)" radius={[6, 6, 0, 0]} maxBarSize={56} />
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
@@ -67,14 +83,33 @@ export function InsightCharts({ match, theme = getSportTheme("football") }: { ma
         theme={theme}
       >
         <ResponsiveContainer width="100%" height={250}>
-          <BarChart data={shotData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,.22)" />
-            <XAxis dataKey="name" stroke="#64748b" />
-            <YAxis stroke="#64748b" />
+          <BarChart data={shotData} barGap={10} barCategoryGap="36%" margin={{ top: 10, right: 8, left: -12, bottom: 0 }}>
+            <defs>
+              <linearGradient id="teamAGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#34d399" />
+                <stop offset="100%" stopColor="#059669" />
+              </linearGradient>
+              <linearGradient id="teamBGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#fbbf24" />
+                <stop offset="100%" stopColor="#f59e0b" />
+              </linearGradient>
+            </defs>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#E2E8F0" opacity={0.4} />
+            <XAxis
+              dataKey="name"
+              axisLine={{ stroke: "#CBD5E1", strokeWidth: 1 }}
+              tickLine={false}
+              tick={{ fill: "#94A3B8", fontSize: 12, fontFamily: "inherit" }}
+            />
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: "#94A3B8", fontSize: 12, fontFamily: "inherit" }}
+            />
             <Tooltip />
-            <Legend />
-            <Bar dataKey={match.teamA} fill={theme.chartA} radius={[10, 10, 0, 0]} />
-            <Bar dataKey={match.teamB} fill={theme.chartB} radius={[10, 10, 0, 0]} />
+            <Legend iconType="circle" wrapperStyle={{ color: "#64748B", fontSize: 12, paddingTop: 8 }} />
+            <Bar dataKey={match.teamA} fill="url(#teamAGradient)" radius={[6, 6, 0, 0]} maxBarSize={38} />
+            <Bar dataKey={match.teamB} fill="url(#teamBGradient)" radius={[6, 6, 0, 0]} maxBarSize={38} />
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
@@ -152,9 +187,9 @@ function ChartCard({
         </button>
       </div>
       <div className="mt-5">{children}</div>
-      <div className="mt-5 rounded-2xl border p-4 text-sm leading-7" style={{ borderColor: theme.border, backgroundColor: theme.background, color: theme.mutedText }}>
-        <div><span className="font-semibold" style={{ color: theme.secondary }}>运营解释：</span>{operation}</div>
-        <div className="mt-2"><span className="font-semibold" style={{ color: theme.accent }}>可复制内容金句：</span>{quote}</div>
+      <div className="mt-5 space-y-3.5 rounded-2xl border p-4 text-sm leading-relaxed text-slate-700" style={{ borderColor: theme.border, backgroundColor: theme.background }}>
+        <div><span className="font-semibold" style={{ color: theme.secondary }}>运营解释：</span><HighlightedText text={operation} /></div>
+        <div><span className="font-semibold" style={{ color: theme.accent }}>可复制内容金句：</span><HighlightedText text={quote} /></div>
       </div>
     </div>
   );
