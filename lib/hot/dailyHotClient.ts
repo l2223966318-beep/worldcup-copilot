@@ -1,6 +1,6 @@
-const DEFAULT_BASE_URL = "https://api-hot.imsyy.top";
+const DEFAULT_BASE_URL = "https://nicee-wine.vercel.app";
 export const DEFAULT_DAILY_HOT_BASE_URL = DEFAULT_BASE_URL;
-export const DEFAULT_DAILY_HOT_PLATFORMS = ["weibo", "douyin", "bilibili", "baidu", "zhihu", "hupu", "toutiao"];
+export const DEFAULT_DAILY_HOT_PLATFORMS = ["bilibili", "douyin", "baidu", "toutiao", "hupu"];
 
 export async function fetchDailyHotFeeds(options: { baseUrl?: string; platforms?: string[]; limit?: number } = {}) {
   const baseUrl = normalizeBaseUrl(options.baseUrl);
