@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { fetchXiaohongshuHotItems } from "@/lib/hot/xiaohongshuClient";
+
 export const dynamic = "force-dynamic";
 
 type SourceKey = "tavily" | "topHubData" | "dailyHot" | "xiaohongshu" | "deepseek" | "openai";
@@ -9,6 +11,8 @@ export async function POST(request: Request) {
     source?: SourceKey;
     apiKey?: string;
     sourceUrl?: string;
+    redfoxApiKey?: string;
+    redfoxCategory?: string;
   };
   const source = body.source;
   const apiKey = body.apiKey?.trim();
@@ -37,7 +41,7 @@ export async function POST(request: Request) {
   }
 }
 
-async function testSource(source: SourceKey, apiKey: string, body: { sourceUrl?: string }) {
+async function testSource(source: SourceKey, apiKey: string, body: { sourceUrl?: string; redfoxApiKey?: string; redfoxCategory?: string }) {
   if (source === "tavily") {
     const response = await fetchWithTimeout("https://api.tavily.com/search", {
       method: "POST",
@@ -66,8 +70,20 @@ async function testSource(source: SourceKey, apiKey: string, body: { sourceUrl?:
 
   if (source === "xiaohongshu") {
     const sourceUrl = body.sourceUrl?.trim();
+    const redfoxApiKey = body.redfoxApiKey?.trim();
+    if (!sourceUrl && !redfoxApiKey && !process.env.REDFOX_API_KEY) {
+      return { ok: false, mode: "demo", message: "未填写 RedFox API Key，无法获取小红书实时热点。" };
+    }
+    if (redfoxApiKey || process.env.REDFOX_API_KEY) {
+      const result = await fetchXiaohongshuHotItems(3, {
+        redfoxApiKey,
+        redfoxCategory: body.redfoxCategory?.trim() || "体育锻炼"
+      });
+      if (!result.items.length) throw new Error(result.message || "RedFox 小红书源暂无可展示数据");
+      return { ok: true, mode: "live", message: `RedFox 小红书源连接成功，读取到 ${result.items.length} 条样例。` };
+    }
     if (!sourceUrl) {
-      return { ok: false, mode: "demo", message: "未填写小红书热点接口 URL，无法获取小红书站内实时热点。" };
+      return { ok: false, mode: "demo", message: "未填写小红书热点接口 URL。" };
     }
     const target = new URL(sourceUrl);
     if (!target.searchParams.has("limit")) target.searchParams.set("limit", "3");

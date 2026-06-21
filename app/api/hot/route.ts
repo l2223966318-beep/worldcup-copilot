@@ -74,7 +74,7 @@ export async function GET(request: Request) {
   }
 
   const hotTypes = getRequestedTypes(source);
-  const canUseXhsOnly = hotTypes.includes("xiaohongshu") && Boolean(clientXhs.apiUrl || process.env.XHS_HOT_API_URL);
+  const canUseXhsOnly = hotTypes.includes("xiaohongshu") && Boolean(clientXhs.apiUrl || clientXhs.redfoxApiKey || process.env.XHS_HOT_API_URL || process.env.REDFOX_API_KEY);
   const canUseDailyHot = hotTypes.some((type) => type !== "xiaohongshu");
 
   if ((!baseUrl || !endpoint) && !canUseXhsOnly && !canUseDailyHot) {
@@ -89,7 +89,9 @@ export async function GET(request: Request) {
       if (type === "xiaohongshu") {
         return fetchXiaohongshuHotItems(requestLimit, {
           apiUrl: clientXhs.apiUrl,
-          apiKey: clientXhs.apiKey
+          apiKey: clientXhs.apiKey,
+          redfoxApiKey: clientXhs.redfoxApiKey,
+          redfoxCategory: clientXhs.redfoxCategory
         });
       }
 
@@ -199,11 +201,15 @@ function buildUApiHeaders(apiKey?: string) {
 function readClientXhsConfig(request: Request) {
   const apiUrl = request.headers.get("x-worldcup-xhs-url")?.trim() || undefined;
   const apiKey = request.headers.get("x-worldcup-xhs-key")?.trim() || undefined;
+  const redfoxApiKey = request.headers.get("x-worldcup-redfox-key")?.trim() || undefined;
+  const redfoxCategory = request.headers.get("x-worldcup-redfox-xhs-category")?.trim() || undefined;
 
   return {
     apiUrl,
     apiKey,
-    cacheKey: `${apiUrl ?? ""}:${Boolean(apiKey)}`
+    redfoxApiKey,
+    redfoxCategory,
+    cacheKey: `${apiUrl ?? ""}:${Boolean(apiKey)}:${Boolean(redfoxApiKey)}:${redfoxCategory ?? ""}`
   };
 }
 

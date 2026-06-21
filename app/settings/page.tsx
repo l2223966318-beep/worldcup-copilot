@@ -11,6 +11,8 @@ type SettingsState = {
   dailyHotBaseUrl: string;
   xhsHotUrl: string;
   xhsHotKey: string;
+  redfoxApiKey: string;
+  redfoxXhsCategory: string;
   deepseekKey: string;
   openaiKey: string;
   manualHotSignals: string;
@@ -23,7 +25,7 @@ const sourceRows: Array<{ key: SourceKey; label: string; field: keyof SettingsSt
   { key: "tavily", label: "Tavily", field: "tavilyKey", hint: "用于全网热点搜索和事件补充。" },
   { key: "topHubData", label: "今日热榜 / 榜眼数据", field: "topHubDataKey", hint: "用于接入微博、抖音、B站等热榜数据源。" },
   { key: "dailyHot", label: "DailyHotApi", field: "dailyHotBaseUrl", hint: "用于接入自部署聚合热榜，支持微博、抖音、B站、知乎等，不包含小红书。" },
-  { key: "xiaohongshu", label: "小红书热点源", field: "xhsHotKey", hint: "只读取小红书站内热点接口或第三方小红书热榜源，不用公开搜索结果代替。" },
+  { key: "xiaohongshu", label: "小红书热点源", field: "xhsHotKey", hint: "优先接入 RedFox 小红书每日爆款笔记，也保留自定义小红书热榜接口。" },
   { key: "deepseek", label: "DeepSeek", field: "deepseekKey", hint: "用于赛事分析、选题和内容生成增强。" },
   { key: "openai", label: "OpenAI", field: "openaiKey", hint: "可作为 DeepSeek 之外的模型配置空间。" }
 ];
@@ -34,6 +36,8 @@ const defaultSettings: SettingsState = {
   dailyHotBaseUrl: "",
   xhsHotUrl: "",
   xhsHotKey: "",
+  redfoxApiKey: "",
+  redfoxXhsCategory: "体育锻炼",
   deepseekKey: "",
   openaiKey: "",
   manualHotSignals: "美国队乌龙球\n韩国球员球衣被扯破\nVAR 判罚争议",
@@ -82,7 +86,9 @@ export default function SettingsPage() {
         body: JSON.stringify({
           source: row.key,
           apiKey,
-          sourceUrl: row.key === "xiaohongshu" ? settings.xhsHotUrl : row.key === "dailyHot" ? settings.dailyHotBaseUrl : undefined
+          sourceUrl: row.key === "xiaohongshu" ? settings.xhsHotUrl : row.key === "dailyHot" ? settings.dailyHotBaseUrl : undefined,
+          redfoxApiKey: row.key === "xiaohongshu" ? settings.redfoxApiKey : undefined,
+          redfoxCategory: row.key === "xiaohongshu" ? settings.redfoxXhsCategory : undefined
         })
       });
       const result = (await response.json()) as { ok: boolean; message: string; mode?: string };
@@ -122,7 +128,7 @@ export default function SettingsPage() {
               </div>
               <label className="mt-4 block">
                 <span className="text-xs font-semibold text-slate-500">
-                  {row.key === "xiaohongshu" ? "接口 Key（可选）" : row.key === "dailyHot" ? "Base URL" : "API Key"}
+                  {row.key === "xiaohongshu" ? "自定义接口 Key（可选）" : row.key === "dailyHot" ? "Base URL" : "API Key"}
                 </span>
                 <input
                   type={row.key === "dailyHot" ? "url" : "password"}
@@ -140,6 +146,25 @@ export default function SettingsPage() {
               {row.key === "xiaohongshu" ? (
                 <div className="mt-3 space-y-3">
                   <label className="block">
+                    <span className="text-xs font-semibold text-slate-500">RedFox API Key</span>
+                    <input
+                      type="password"
+                      value={settings.redfoxApiKey}
+                      onChange={(event) => updateField("redfoxApiKey", event.target.value)}
+                      placeholder="ak_xxxxxxxx"
+                      className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-800 outline-none focus:border-emerald-300 focus:bg-white"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-semibold text-slate-500">RedFox 小红书分类</span>
+                    <input
+                      value={settings.redfoxXhsCategory}
+                      onChange={(event) => updateField("redfoxXhsCategory", event.target.value)}
+                      placeholder="体育锻炼"
+                      className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-800 outline-none focus:border-emerald-300 focus:bg-white"
+                    />
+                  </label>
+                  <label className="block">
                     <span className="text-xs font-semibold text-slate-500">小红书热点接口 URL（可选）</span>
                     <input
                       value={settings.xhsHotUrl}
@@ -149,7 +174,7 @@ export default function SettingsPage() {
                     />
                   </label>
                   <p className="rounded-2xl bg-slate-50 px-4 py-3 text-xs leading-6 text-slate-600">
-                    这里需要真实的小红书热点接口。公开网页搜索不会被当成小红书热点源。
+                    不填自定义 URL 时，系统会使用 RedFox「小红书每日爆款笔记」。
                   </p>
                 </div>
               ) : null}

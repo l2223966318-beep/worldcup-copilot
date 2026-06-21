@@ -7,10 +7,16 @@ export async function fetchXiaohongshuHotItems(
   options: {
     apiUrl?: string;
     apiKey?: string;
+    redfoxApiKey?: string;
+    redfoxCategory?: string;
+    redfoxRankDate?: string;
   } = {}
 ): Promise<{ items: HotItem[]; message?: string }> {
   const configuredUrl = options.apiUrl?.trim() || process.env.XHS_HOT_API_URL?.trim();
   const configuredKey = options.apiKey?.trim() || process.env.XHS_HOT_API_KEY?.trim();
+  const redfoxApiKey = options.redfoxApiKey?.trim() || process.env.REDFOX_API_KEY?.trim();
+  const redfoxCategory = options.redfoxCategory?.trim() || process.env.REDFOX_XHS_CATEGORY?.trim() || "体育锻炼";
+  const redfoxRankDate = options.redfoxRankDate?.trim() || process.env.REDFOX_XHS_RANK_DATE?.trim() || getDefaultRedFoxRankDate();
 
   if (configuredUrl) {
     try {
@@ -22,9 +28,32 @@ export async function fetchXiaohongshuHotItems(
     }
   }
 
+  if (redfoxApiKey) {
+    try {
+      const items = await fetchRedFoxXhsSource({
+        apiKey: redfoxApiKey,
+        category: redfoxCategory,
+        rankDate: redfoxRankDate,
+        limit
+      });
+      return {
+        items,
+        message: items.length ? `小红书热点源：RedFox ${redfoxCategory}，榜单日期 ${redfoxRankDate}。` : `RedFox 小红书源暂无 ${redfoxCategory} 榜单数据。`
+      };
+    } catch (error) {
+      console.error("[hot-api] RedFox XHS source failed", {
+        status: error instanceof Error ? error.message : String(error)
+      });
+      return {
+        items: [],
+        message: "RedFox 小红书热点源请求失败，请检查 API Key 或额度状态。"
+      };
+    }
+  }
+
   return {
     items: [],
-    message: "暂未配置小红书实时热点源：请设置 XHS_HOT_API_URL 或在设置页填写小红书热点接口 URL。"
+    message: "暂未配置小红书实时热点源：请填写 RedFox API Key，或设置小红书热点接口 URL。"
   };
 }
 
@@ -44,12 +73,46 @@ async function fetchConfiguredXhsSource(url: string, apiKey: string | undefined,
   return extractArray(payload).map((item, index) => normalizeXhsItem(item, index, "小红书配置源"));
 }
 
+async function fetchRedFoxXhsSource({
+  apiKey,
+  category,
+  rankDate,
+  limit
+}: {
+  apiKey: string;
+  category: string;
+  rankDate: string;
+  limit: number;
+}) {
+  const target = new URL("https://redfox.hk/story/api/cozeSkill/getXhsCozeSkillDataOne");
+  target.searchParams.set("rankDate", rankDate);
+  target.searchParams.set("source", "小红书单日数据爆款文章-GitHub");
+  target.searchParams.set("category", category);
+
+  const response = await fetch(target, {
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      "X-API-KEY": apiKey
+    }
+  });
+  if (!response.ok) throw new Error(`RedFox 小红书源返回 ${response.status}`);
+
+  const payload = await response.json();
+  const root = asRecord(payload);
+  if (typeof root.code === "number" && root.code !== 2000 && root.code !== 200) {
+    throw new Error(pickString(root, ["msg", "message"]) || `RedFox 返回 ${root.code}`);
+  }
+
+  return dedupe(extractArray(payload).map((item, index) => normalizeRedFoxXhsItem(item, index, category, rankDate))).slice(0, limit);
+}
+
 function normalizeXhsItem(item: unknown, index: number, source: string) {
   const record = asRecord(item);
-  const title = pickString(record, ["title", "name", "keyword", "word"]) || "未命名小红书热点";
-  const summary = pickString(record, ["summary", "desc", "description", "content"]) || title;
-  const url = pickString(record, ["url", "link", "href", "noteUrl"]);
-  const heat = pickValue(record, ["heat", "hot", "score", "likes", "views"]);
+  const title = pickString(record, ["title", "name", "keyword", "word", "noteTitle"]) || "未命名小红书热点";
+  const summary = pickString(record, ["summary", "desc", "description", "content", "noteDesc"]) || title;
+  const url = pickString(record, ["url", "link", "href", "noteUrl", "photoJumpUrl"]);
+  const heat = pickValue(record, ["heat", "hot", "score", "likes", "views", "interactiveCount"]);
   const publishedAt = pickString(record, ["publishedAt", "time", "createdAt", "updatedAt"]);
   return createItem({
     idSeed: `${source}:${url || title}`,
@@ -61,7 +124,41 @@ function normalizeXhsItem(item: unknown, index: number, source: string) {
     rank: numberValue(record.rank) ?? index + 1,
     heat,
     publishedAt,
-    raw: item
+    raw: item,
+    tags: ["小红书", "实时热点"]
+  });
+}
+
+function normalizeRedFoxXhsItem(item: unknown, index: number, category: string, rankDate: string) {
+  const record = asRecord(item);
+  const anaAdd = asRecord(record.anaAdd);
+  const title = pickString(record, ["title", "noteTitle", "name"]) || "未命名小红书爆款笔记";
+  const desc = pickString(record, ["desc", "summary", "description", "content"]);
+  const userName = pickString(record, ["userName", "nickname", "author"]);
+  const url = pickString(record, ["photoJumpUrl", "url", "link", "href", "noteUrl"]);
+  const heat =
+    pickValue(anaAdd, ["interactiveCount", "addInteractiveount", "useLikeCount", "collectedCount"]) ??
+    pickValue(record, ["interactiveCount", "addInteractiveount", "useLikeCount", "heat", "hot"]);
+  const summaryParts = [
+    userName ? `作者：${userName}` : "",
+    desc || title,
+    formatMetric("互动", pickValue(anaAdd, ["interactiveCount"]), pickValue(anaAdd, ["addInteractiveount"])),
+    formatMetric("点赞", pickValue(anaAdd, ["useLikeCount"]), pickValue(anaAdd, ["addLikeCount"])),
+    formatMetric("收藏", pickValue(anaAdd, ["collectedCount"]), pickValue(anaAdd, ["addCollectedCunt"]))
+  ].filter(Boolean);
+
+  return createItem({
+    idSeed: `redfox-xhs:${rankDate}:${url || title}`,
+    title,
+    summary: summaryParts.join("；"),
+    url,
+    source: `RedFox 小红书每日爆款笔记`,
+    platform: "小红书",
+    rank: numberValue(record.rank) ?? index + 1,
+    heat,
+    publishedAt: `${rankDate} 19:00`,
+    raw: item,
+    tags: ["小红书", "实时热点", "RedFox", category]
   });
 }
 
@@ -76,6 +173,7 @@ function createItem(input: {
   heat?: string | number;
   publishedAt?: string;
   raw: unknown;
+  tags?: string[];
 }): HotItem {
   return {
     id: stableId(input.idSeed),
@@ -90,7 +188,7 @@ function createItem(input: {
     publishedAt: input.publishedAt,
     time: input.publishedAt,
     relevance: 50,
-    tags: ["小红书", "实时热点"],
+    tags: input.tags ?? ["小红书", "实时热点"],
     raw: input.raw
   };
 }
@@ -109,6 +207,27 @@ function extractArray(payload: unknown): unknown[] {
   if (Array.isArray(result.list)) return result.list;
   if (Array.isArray(result.items)) return result.items;
   return [];
+}
+
+function formatMetric(label: string, total: unknown, added: unknown) {
+  const totalText = stringifyMetric(total);
+  const addedText = stringifyMetric(added);
+  if (!totalText && !addedText) return "";
+  return `${label}${totalText || "-"}${addedText ? `，新增${addedText}` : ""}`;
+}
+
+function stringifyMetric(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "string" && value.trim()) return value.trim();
+  return "";
+}
+
+function getDefaultRedFoxRankDate() {
+  const now = new Date();
+  const chinaNow = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  const queryOffset = chinaNow.getUTCHours() >= 19 ? 1 : 2;
+  chinaNow.setUTCDate(chinaNow.getUTCDate() - queryOffset);
+  return chinaNow.toISOString().slice(0, 10);
 }
 
 function dedupe(items: HotItem[]) {
