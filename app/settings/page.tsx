@@ -20,6 +20,7 @@ type SettingsState = {
 };
 
 const STORAGE_KEY = "worldcup.datasource.settings";
+const redfoxXhsCategories = ["综合全部", "影视娱乐", "数码科技", "新闻资讯", "体育锻炼", "日常生活", "休闲爱好", "时尚穿搭", "旅行度假", "美味佳肴"];
 
 const sourceRows: Array<{ key: SourceKey; label: string; field: keyof SettingsState; hint: string }> = [
   { key: "tavily", label: "Tavily", field: "tavilyKey", hint: "用于全网热点搜索和事件补充。" },
@@ -157,12 +158,17 @@ export default function SettingsPage() {
                   </label>
                   <label className="block">
                     <span className="text-xs font-semibold text-slate-500">RedFox 小红书分类</span>
-                    <input
+                    <select
                       value={settings.redfoxXhsCategory}
                       onChange={(event) => updateField("redfoxXhsCategory", event.target.value)}
-                      placeholder="体育锻炼"
                       className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-800 outline-none focus:border-emerald-300 focus:bg-white"
-                    />
+                    >
+                      {redfoxXhsCategories.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                   <label className="block">
                     <span className="text-xs font-semibold text-slate-500">小红书热点接口 URL（可选）</span>

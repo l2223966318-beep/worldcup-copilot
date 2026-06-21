@@ -2,6 +2,34 @@ import type { HotItem } from "@/lib/hot/types";
 
 type AnyRecord = Record<string, unknown>;
 
+const REDFOX_XHS_CATEGORIES = [
+  "综合全部",
+  "出行代步",
+  "休闲爱好",
+  "影视娱乐",
+  "数码科技",
+  "医疗保健",
+  "综合杂项",
+  "星座情感",
+  "时尚穿搭",
+  "婚庆婚礼",
+  "拍摄记录",
+  "学习教育",
+  "化妆美容",
+  "居家装修",
+  "旅行度假",
+  "亲子育儿",
+  "个人护理",
+  "美味佳肴",
+  "职业发展",
+  "宠物天地",
+  "潮流鞋包",
+  "日常生活",
+  "科学探索",
+  "新闻资讯",
+  "体育锻炼"
+] as const;
+
 export async function fetchXiaohongshuHotItems(
   limit: number,
   options: {
@@ -15,7 +43,7 @@ export async function fetchXiaohongshuHotItems(
   const configuredUrl = options.apiUrl?.trim() || process.env.XHS_HOT_API_URL?.trim();
   const configuredKey = options.apiKey?.trim() || process.env.XHS_HOT_API_KEY?.trim();
   const redfoxApiKey = options.redfoxApiKey?.trim() || process.env.REDFOX_API_KEY?.trim();
-  const redfoxCategory = options.redfoxCategory?.trim() || process.env.REDFOX_XHS_CATEGORY?.trim() || "体育锻炼";
+  const redfoxCategory = normalizeRedFoxCategory(options.redfoxCategory?.trim() || process.env.REDFOX_XHS_CATEGORY?.trim());
   const redfoxRankDate = options.redfoxRankDate?.trim() || process.env.REDFOX_XHS_RANK_DATE?.trim() || getDefaultRedFoxRankDate();
 
   if (configuredUrl) {
@@ -46,7 +74,7 @@ export async function fetchXiaohongshuHotItems(
       });
       return {
         items: [],
-        message: "RedFox 小红书热点源请求失败，请检查 API Key 或额度状态。"
+        message: error instanceof Error ? `RedFox 小红书热点源请求失败：${error.message}` : "RedFox 小红书热点源请求失败。"
       };
     }
   }
@@ -228,6 +256,14 @@ function getDefaultRedFoxRankDate() {
   const queryOffset = chinaNow.getUTCHours() >= 19 ? 1 : 2;
   chinaNow.setUTCDate(chinaNow.getUTCDate() - queryOffset);
   return chinaNow.toISOString().slice(0, 10);
+}
+
+function normalizeRedFoxCategory(value?: string) {
+  const text = value?.trim();
+  if (!text) return "体育锻炼";
+  if ((REDFOX_XHS_CATEGORIES as readonly string[]).includes(text)) return text;
+  if (/世界杯|足球|体育|运动|健身|比赛|赛事|球星|进球|射门|点球/i.test(text)) return "体育锻炼";
+  return "综合全部";
 }
 
 function dedupe(items: HotItem[]) {
