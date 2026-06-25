@@ -419,7 +419,7 @@ function OpportunityMatchCard({
   const awayTeam = localizeTeamName(match.awayTeam.name);
   const round = localizeRoundName(match.round || "世界杯赛程");
   const statusText = localizeMatchStatus(match.statusText);
-  const heatTone = matchHeatTone(opportunity.score);
+  const heatTone = matchHeatTone(opportunity.score, theme);
 
   return (
     <article
@@ -427,7 +427,7 @@ function OpportunityMatchCard({
       style={heatTone}
     >
       <div className="flex items-center gap-3 lg:block">
-        <div className="flex h-14 w-14 items-center justify-center rounded-[22px] text-2xl font-black text-white shadow-sm lg:h-16 lg:w-16 lg:text-3xl" style={{ backgroundColor: priorityColor(priority) }}>
+        <div className="flex h-14 w-14 items-center justify-center rounded-[22px] text-2xl font-black text-white shadow-sm lg:h-16 lg:w-16 lg:text-3xl" style={{ backgroundColor: priorityColor(priority, theme) }}>
           {priority}
         </div>
         <div className="text-sm font-semibold text-slate-500 lg:mt-2">机会等级</div>
@@ -460,8 +460,8 @@ function OpportunityMatchCard({
           </div>
           <Link
             href={`/matches/${match.id}`}
-            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(15,23,42,0.12)] transition hover:-translate-y-0.5"
-            style={{ background: "linear-gradient(135deg, #0f172a, #1e293b)" }}
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold text-white transition hover:-translate-y-0.5"
+            style={{ backgroundColor: theme.primary, boxShadow: `0 14px 30px ${theme.heroGlow}` }}
           >
             进入分析
             <ArrowRight className="h-4 w-4" />
@@ -657,46 +657,46 @@ function getOpportunityScore(match: WorldCupMatch) {
   };
 }
 
-function priorityColor(priority: string) {
-  if (priority === "S") return "#111827";
-  if (priority === "A") return "#334155";
+function priorityColor(priority: string, theme: SportTheme) {
+  if (priority === "S") return theme.primary;
+  if (priority === "A") return theme.accent;
   if (priority === "C") return "#94a3b8";
-  return "#64748b";
+  return theme.secondary;
 }
 
-function matchHeatTone(score: number): CSSProperties {
+function matchHeatTone(score: number, theme: SportTheme): CSSProperties {
   if (score >= 85) {
     return {
       background:
-        "radial-gradient(circle at 92% 50%, rgba(180,130,75,0.22) 0%, rgba(180,130,75,0.1) 30%, transparent 58%), linear-gradient(112deg, transparent 0%, transparent 64%, rgba(255,255,255,0.46) 64.4%, transparent 66.2%), linear-gradient(118deg, rgba(255,255,255,0.99) 0%, rgba(250,250,249,0.98) 48%, rgba(246,243,238,0.94) 100%)",
-      borderColor: "rgba(180, 130, 75, 0.42)",
-      boxShadow: "0 22px 64px rgba(15,23,42,0.082), inset 0 1px 0 rgba(255,255,255,0.92)"
+        "radial-gradient(circle at 88% 50%, rgba(16,185,129,0.48) 0%, rgba(16,185,129,0.2) 24%, transparent 50%), radial-gradient(circle at 10% 0%, rgba(251,191,36,0.25) 0%, transparent 36%), linear-gradient(112deg, transparent 0%, transparent 58%, rgba(255,255,255,0.5) 58.4%, transparent 60.4%), linear-gradient(118deg, rgba(255,255,255,0.98) 0%, rgba(236,253,245,0.96) 42%, rgba(187,247,208,0.86) 73%, rgba(255,247,237,0.94) 100%)",
+      borderColor: "rgba(16, 185, 129, 0.66)",
+      boxShadow: `0 22px 64px rgba(15,23,42,0.085), 0 0 58px ${theme.heroGlow}`
     };
   }
 
   if (score >= 70) {
     return {
       background:
-        "radial-gradient(circle at 92% 52%, rgba(71,85,105,0.17) 0%, rgba(71,85,105,0.075) 31%, transparent 58%), linear-gradient(112deg, transparent 0%, transparent 65%, rgba(255,255,255,0.42) 65.4%, transparent 67%), linear-gradient(118deg, rgba(255,255,255,0.99) 0%, rgba(248,250,252,0.98) 50%, rgba(241,245,249,0.94) 100%)",
-      borderColor: "rgba(100, 116, 139, 0.34)",
-      boxShadow: "0 20px 58px rgba(15,23,42,0.07), inset 0 1px 0 rgba(255,255,255,0.9)"
+        "radial-gradient(circle at 90% 52%, rgba(34,197,94,0.38) 0%, rgba(34,197,94,0.16) 27%, transparent 50%), radial-gradient(circle at 12% 0%, rgba(251,191,36,0.2) 0%, transparent 34%), linear-gradient(112deg, transparent 0%, transparent 60%, rgba(255,255,255,0.46) 60.4%, transparent 62.4%), linear-gradient(118deg, rgba(255,255,255,0.98) 0%, rgba(240,253,244,0.95) 46%, rgba(187,247,208,0.76) 78%, rgba(255,251,235,0.9) 100%)",
+      borderColor: "rgba(34, 197, 94, 0.54)",
+      boxShadow: "0 20px 58px rgba(15,23,42,0.07), 0 0 40px rgba(34,197,94,0.15)"
     };
   }
 
   if (score >= 55) {
     return {
       background:
-        "radial-gradient(circle at 92% 54%, rgba(148,163,184,0.16) 0%, rgba(148,163,184,0.07) 32%, transparent 58%), linear-gradient(112deg, transparent 0%, transparent 66%, rgba(255,255,255,0.38) 66.4%, transparent 68%), linear-gradient(118deg, rgba(255,255,255,0.99) 0%, rgba(250,250,250,0.98) 52%, rgba(245,247,250,0.94) 100%)",
-      borderColor: "rgba(148, 163, 184, 0.3)",
-      boxShadow: "0 18px 50px rgba(15,23,42,0.062), inset 0 1px 0 rgba(255,255,255,0.9)"
+        "radial-gradient(circle at 91% 54%, rgba(20,184,166,0.3) 0%, rgba(20,184,166,0.12) 28%, transparent 52%), radial-gradient(circle at 10% 0%, rgba(251,191,36,0.14) 0%, transparent 34%), linear-gradient(112deg, transparent 0%, transparent 62%, rgba(255,255,255,0.4) 62.4%, transparent 64.4%), linear-gradient(118deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.94) 50%, rgba(204,251,241,0.66) 100%)",
+      borderColor: "rgba(20, 184, 166, 0.42)",
+      boxShadow: "0 18px 50px rgba(15,23,42,0.064), 0 0 34px rgba(20,184,166,0.1)"
     };
   }
 
   return {
     background:
-      "radial-gradient(circle at 92% 54%, rgba(203,213,225,0.16) 0%, rgba(203,213,225,0.07) 32%, transparent 58%), linear-gradient(118deg, rgba(255,255,255,0.99) 0%, rgba(248,250,252,0.98) 54%, rgba(241,245,249,0.94) 100%)",
-    borderColor: "rgba(203, 213, 225, 0.42)",
-    boxShadow: "0 18px 48px rgba(15,23,42,0.056), inset 0 1px 0 rgba(255,255,255,0.9)"
+      "radial-gradient(circle at 91% 54%, rgba(34,197,94,0.24) 0%, rgba(34,197,94,0.08) 29%, transparent 52%), radial-gradient(circle at 12% 0%, rgba(251,191,36,0.1) 0%, transparent 34%), linear-gradient(112deg, transparent 0%, transparent 63%, rgba(255,255,255,0.36) 63.4%, transparent 65.4%), linear-gradient(118deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.96) 52%, rgba(220,252,231,0.64) 100%)",
+    borderColor: "rgba(34, 197, 94, 0.3)",
+    boxShadow: "0 18px 48px rgba(15,23,42,0.06), 0 0 30px rgba(34,197,94,0.08)"
   };
 }
 
