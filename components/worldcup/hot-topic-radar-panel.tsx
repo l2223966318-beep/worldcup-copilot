@@ -153,15 +153,26 @@ export function HotTopicRadarPanel({
         <div className="mt-4 space-y-3">
           {filteredTopics.length ? (
             filteredTopics.slice(0, 12).map((topic, index) => {
+              const isFeaturedAll = activeTab === "全部" && index < 3;
+              const featureRank = index + 1;
               return (
                 <article
                   key={topic.id}
                   onClick={() => openTopic(topic)}
-                  className="block w-full cursor-pointer rounded-[24px] border bg-slate-50 p-4 text-left transition hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_14px_36px_rgba(15,23,42,0.08)]"
-                  style={{ borderColor: theme.border }}
+                  className={`block w-full cursor-pointer rounded-[24px] border p-4 text-left transition hover:-translate-y-0.5 ${
+                    isFeaturedAll
+                      ? `hot-topic-feature-card hot-topic-feature-${featureRank}`
+                      : "bg-slate-50 hover:bg-white hover:shadow-[0_14px_36px_rgba(15,23,42,0.08)]"
+                  }`}
+                  style={isFeaturedAll ? undefined : { borderColor: theme.border }}
                 >
                   <div className="flex items-start gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black text-white" style={{ backgroundColor: theme.primary }}>
+                    <div
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black text-white ${
+                        isFeaturedAll ? `hot-topic-feature-rank hot-topic-feature-rank-${featureRank}` : ""
+                      }`}
+                      style={isFeaturedAll ? undefined : { backgroundColor: theme.primary }}
+                    >
                       {topic.rank ?? index + 1}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -171,7 +182,7 @@ export function HotTopicRadarPanel({
                           target="_blank"
                           rel="noreferrer"
                           onClick={(event) => event.stopPropagation()}
-                          className="line-clamp-2 text-base font-black leading-6 text-slate-950 transition hover:text-emerald-700"
+                          className={`line-clamp-2 text-base font-black leading-6 text-slate-950 transition ${isFeaturedAll ? "hover:text-violet-700" : "hover:text-emerald-700"}`}
                         >
                           {topic.title}
                         </a>
@@ -195,7 +206,9 @@ export function HotTopicRadarPanel({
                             event.stopPropagation();
                             openTopic(topic);
                           }}
-                          className="inline-flex h-8 items-center rounded-full bg-white px-3.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:bg-slate-50"
+                          className={`inline-flex h-8 items-center rounded-full px-3.5 text-xs font-semibold ring-1 transition hover:-translate-y-0.5 ${
+                            isFeaturedAll ? "bg-white/80 text-slate-800 ring-white/80 backdrop-blur hover:bg-white" : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"
+                          }`}
                         >
                           查看详情
                         </button>
@@ -205,8 +218,10 @@ export function HotTopicRadarPanel({
                             event.stopPropagation();
                             openTopic(topic, "generate");
                           }}
-                          className="inline-flex h-8 items-center rounded-full px-3.5 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5"
-                          style={{ backgroundColor: theme.primary }}
+                          className={`inline-flex h-8 items-center rounded-full px-3.5 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 ${
+                            isFeaturedAll ? `hot-topic-feature-action hot-topic-feature-action-${featureRank}` : ""
+                          }`}
+                          style={isFeaturedAll ? undefined : { backgroundColor: theme.primary }}
                         >
                           生成选题
                         </button>
