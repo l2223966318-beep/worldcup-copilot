@@ -91,7 +91,7 @@ export default function DashboardPage() {
       <ThemeSideSelector active={sportType} onChange={selectSportTheme} />
       <ImmersiveWorldCupHero />
 
-      <div className="mx-auto grid w-full max-w-7xl items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(360px,2fr)]">
+      <div className="mx-auto grid w-full max-w-[1600px] items-start gap-5 px-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(380px,0.95fr)] lg:px-6 xl:grid-cols-[minmax(0,1.72fr)_minmax(420px,0.9fr)]">
         <div className="min-w-0 space-y-8">
           <section id="opportunity-pool">
             <div className="flex flex-wrap items-end justify-between gap-4">
@@ -104,7 +104,7 @@ export default function DashboardPage() {
                 error={error || sourceIssue}
               />
             </div>
-            <div className="mt-5 grid gap-3 rounded-[24px] border border-slate-200 bg-white p-4 md:grid-cols-4">
+            <div className="mt-5 grid gap-3 rounded-[22px] border border-slate-200 bg-white p-3.5 md:grid-cols-4">
               <label className="block">
                 <span className="text-xs font-semibold text-slate-500">搜索比赛 / 球队</span>
                 <input
@@ -419,55 +419,54 @@ function OpportunityMatchCard({
   const awayTeam = localizeTeamName(match.awayTeam.name);
   const round = localizeRoundName(match.round || "世界杯赛程");
   const statusText = localizeMatchStatus(match.statusText);
+  const heatTone = matchHeatTone(opportunity.score, theme);
 
   return (
     <article
-      className="grid gap-5 rounded-[30px] border bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] transition hover:-translate-y-1 hover:shadow-[0_28px_80px_rgba(15,23,42,0.1)] lg:grid-cols-[90px_1fr_180px]"
-      style={{ borderColor: theme.border }}
+      className="grid gap-4 rounded-[28px] border p-4 shadow-[0_18px_50px_rgba(15,23,42,0.055)] transition hover:-translate-y-1 hover:shadow-[0_26px_76px_rgba(15,23,42,0.1)] md:p-5 lg:grid-cols-[74px_minmax(0,1fr)]"
+      style={heatTone}
     >
       <div className="flex items-center gap-3 lg:block">
-        <div className="flex h-16 w-16 items-center justify-center rounded-3xl text-3xl font-black text-white" style={{ backgroundColor: priorityColor(priority, theme) }}>
+        <div className="flex h-14 w-14 items-center justify-center rounded-[22px] text-2xl font-black text-white shadow-sm lg:h-16 lg:w-16 lg:text-3xl" style={{ backgroundColor: priorityColor(priority, theme) }}>
           {priority}
         </div>
         <div className="text-sm font-semibold text-slate-500 lg:mt-2">机会等级</div>
         <div className="mt-1 text-xs font-semibold text-slate-400 lg:mt-1">评分 {opportunity.score}</div>
-        <div className="mt-2 flex flex-wrap gap-1.5 lg:mt-3">
-          {opportunity.signals.slice(0, 3).map((signal) => (
-            <span key={signal} className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-              {signal}
-            </span>
-          ))}
-        </div>
       </div>
-      <div>
+      <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
             北京时间 {formatKickoffTime(match.kickoffTime)}
           </span>
-          <h3 className="text-3xl font-semibold tracking-tight text-slate-950">
+          <h3 className="min-w-0 text-2xl font-semibold tracking-tight text-slate-950 lg:text-[1.72rem]">
             {homeTeam} <span style={{ color: theme.primary }}>{match.score.display}</span> {awayTeam}
           </h3>
           <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{statusText}</span>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{round}</span>
           <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">风险：{risk}</span>
         </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {["B站", "微博", "赛后复盘", "数据解读", localizeVenue(match.venue.city ?? match.venue.name)].map((direction) => (
-            <span key={direction} className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
-              {direction}
-            </span>
-          ))}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-wrap gap-2">
+            {opportunity.signals.slice(0, 3).map((signal) => (
+              <span key={signal} className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200/80">
+                {signal}
+              </span>
+            ))}
+            {["B站", "微博", "赛后复盘", "数据解读", localizeVenue(match.venue.city ?? match.venue.name)].map((direction) => (
+              <span key={direction} className="rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200/80">
+                {direction}
+              </span>
+            ))}
+          </div>
+          <Link
+            href={`/matches/${match.id}`}
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold text-white transition hover:-translate-y-0.5"
+            style={{ backgroundColor: theme.primary, boxShadow: `0 14px 30px ${theme.heroGlow}` }}
+          >
+            进入分析
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
-      </div>
-      <div className="flex items-end justify-end">
-        <Link
-          href={`/matches/${match.id}`}
-          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold text-white transition hover:-translate-y-0.5"
-          style={{ backgroundColor: theme.primary, boxShadow: `0 18px 38px ${theme.heroGlow}` }}
-        >
-          进入分析
-          <ArrowRight className="h-4 w-4" />
-        </Link>
       </div>
     </article>
   );
@@ -663,6 +662,35 @@ function priorityColor(priority: string, theme: SportTheme) {
   if (priority === "A") return theme.accent;
   if (priority === "C") return "#94a3b8";
   return theme.secondary;
+}
+
+function matchHeatTone(score: number, theme: SportTheme): CSSProperties {
+  if (score >= 85) {
+    return {
+      background: "linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(236,253,245,0.98) 48%, rgba(255,247,237,0.92) 100%)",
+      borderColor: "rgba(16, 185, 129, 0.34)",
+      boxShadow: `0 22px 64px rgba(15,23,42,0.07), 0 0 44px ${theme.heroGlow}`
+    };
+  }
+
+  if (score >= 70) {
+    return {
+      background: "linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(240,253,244,0.95) 58%, rgba(240,249,255,0.9) 100%)",
+      borderColor: "rgba(34, 197, 94, 0.26)"
+    };
+  }
+
+  if (score >= 55) {
+    return {
+      background: "linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.96) 62%, rgba(236,253,245,0.72) 100%)",
+      borderColor: theme.border
+    };
+  }
+
+  return {
+    background: "linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.96) 100%)",
+    borderColor: "rgba(203, 213, 225, 0.88)"
+  };
 }
 
 function dedupeSignals(signals: string[]) {

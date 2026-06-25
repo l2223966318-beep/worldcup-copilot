@@ -104,7 +104,7 @@ export function HotTopicRadarPanel({
 
   return (
     <aside className="lg:sticky lg:top-24">
-      <div className="rounded-[32px] border bg-white p-5 shadow-[0_20px_70px_rgba(15,23,42,0.07)]" style={{ borderColor: theme.border }}>
+      <div className="rounded-[28px] border bg-white p-4 shadow-[0_20px_70px_rgba(15,23,42,0.07)] xl:p-5" style={{ borderColor: theme.border }}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-xs font-black tracking-[0.18em] text-slate-400">热点雷达</div>
@@ -114,7 +114,7 @@ export function HotTopicRadarPanel({
             type="button"
             onClick={updateHotTopics}
             disabled={loading}
-            className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-semibold text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-semibold text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
             style={{ backgroundColor: theme.primary, boxShadow: `0 14px 30px ${theme.heroGlow}` }}
           >
             <RefreshCcw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -157,7 +157,7 @@ export function HotTopicRadarPanel({
                 <article
                   key={topic.id}
                   onClick={() => openTopic(topic)}
-                  className="block w-full cursor-pointer rounded-3xl border bg-slate-50 p-4 text-left transition hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_14px_36px_rgba(15,23,42,0.08)]"
+                  className="block w-full cursor-pointer rounded-[24px] border bg-slate-50 p-4 text-left transition hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_14px_36px_rgba(15,23,42,0.08)]"
                   style={{ borderColor: theme.border }}
                 >
                   <div className="flex items-start gap-3">
@@ -188,14 +188,14 @@ export function HotTopicRadarPanel({
                         热度：{topic.heat ?? topic.relevanceScore ?? "-"}
                         {typeof topic.valueScore === "number" ? `｜价值分：${topic.valueScore}` : ""}
                       </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
                         <button
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
                             openTopic(topic);
                           }}
-                          className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:-translate-y-0.5"
+                          className="inline-flex h-8 items-center rounded-full bg-white px-3.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:bg-slate-50"
                         >
                           查看详情
                         </button>
@@ -205,7 +205,7 @@ export function HotTopicRadarPanel({
                             event.stopPropagation();
                             openTopic(topic, "generate");
                           }}
-                          className="rounded-full px-3 py-1.5 text-xs font-semibold text-white transition hover:-translate-y-0.5"
+                          className="inline-flex h-8 items-center rounded-full px-3.5 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5"
                           style={{ backgroundColor: theme.primary }}
                         >
                           生成选题
