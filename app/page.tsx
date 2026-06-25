@@ -427,7 +427,7 @@ function OpportunityMatchCard({
       style={heatTone}
     >
       <div className="flex items-center gap-3 lg:block">
-        <div className="flex h-14 w-14 items-center justify-center rounded-[22px] text-2xl font-black text-white shadow-sm lg:h-16 lg:w-16 lg:text-3xl" style={{ backgroundColor: priorityColor(priority, theme) }}>
+        <div className="flex h-14 w-14 items-center justify-center rounded-[22px] text-2xl font-black text-white shadow-sm lg:h-16 lg:w-16 lg:text-3xl" style={{ backgroundColor: priorityColor(priority) }}>
           {priority}
         </div>
         <div className="text-sm font-semibold text-slate-500 lg:mt-2">机会等级</div>
@@ -657,46 +657,46 @@ function getOpportunityScore(match: WorldCupMatch) {
   };
 }
 
-function priorityColor(priority: string, theme: SportTheme) {
-  if (priority === "S") return theme.primary;
-  if (priority === "A") return theme.accent;
-  if (priority === "C") return "#94a3b8";
-  return theme.secondary;
+function priorityColor(priority: string) {
+  if (priority === "S") return "#047857";
+  if (priority === "A") return "#16a34a";
+  if (priority === "B") return "#0f766e";
+  return "#94a3b8";
 }
 
 function matchHeatTone(score: number, theme: SportTheme): CSSProperties {
   if (score >= 85) {
     return {
       background:
-        "radial-gradient(circle at 88% 50%, rgba(16,185,129,0.48) 0%, rgba(16,185,129,0.2) 24%, transparent 50%), radial-gradient(circle at 10% 0%, rgba(251,191,36,0.25) 0%, transparent 36%), linear-gradient(112deg, transparent 0%, transparent 58%, rgba(255,255,255,0.5) 58.4%, transparent 60.4%), linear-gradient(118deg, rgba(255,255,255,0.98) 0%, rgba(236,253,245,0.96) 42%, rgba(187,247,208,0.86) 73%, rgba(255,247,237,0.94) 100%)",
-      borderColor: "rgba(16, 185, 129, 0.66)",
-      boxShadow: `0 22px 64px rgba(15,23,42,0.085), 0 0 58px ${theme.heroGlow}`
+        "radial-gradient(circle at 86% 50%, rgba(4,120,87,0.58) 0%, rgba(16,185,129,0.26) 25%, transparent 52%), radial-gradient(circle at 8% 0%, rgba(245,158,11,0.36) 0%, transparent 38%), linear-gradient(112deg, transparent 0%, transparent 56%, rgba(255,255,255,0.58) 56.4%, transparent 58.6%), linear-gradient(118deg, rgba(255,255,255,0.98) 0%, rgba(236,253,245,0.96) 38%, rgba(167,243,208,0.92) 70%, rgba(255,247,237,0.96) 100%)",
+      borderColor: "rgba(4, 120, 87, 0.78)",
+      boxShadow: `0 24px 72px rgba(15,23,42,0.1), 0 0 66px ${theme.heroGlow}`
     };
   }
 
   if (score >= 70) {
     return {
       background:
-        "radial-gradient(circle at 90% 52%, rgba(34,197,94,0.38) 0%, rgba(34,197,94,0.16) 27%, transparent 50%), radial-gradient(circle at 12% 0%, rgba(251,191,36,0.2) 0%, transparent 34%), linear-gradient(112deg, transparent 0%, transparent 60%, rgba(255,255,255,0.46) 60.4%, transparent 62.4%), linear-gradient(118deg, rgba(255,255,255,0.98) 0%, rgba(240,253,244,0.95) 46%, rgba(187,247,208,0.76) 78%, rgba(255,251,235,0.9) 100%)",
-      borderColor: "rgba(34, 197, 94, 0.54)",
-      boxShadow: "0 20px 58px rgba(15,23,42,0.07), 0 0 40px rgba(34,197,94,0.15)"
+        "radial-gradient(circle at 90% 52%, rgba(22,163,74,0.44) 0%, rgba(34,197,94,0.18) 28%, transparent 52%), radial-gradient(circle at 10% 0%, rgba(251,191,36,0.22) 0%, transparent 36%), linear-gradient(112deg, transparent 0%, transparent 60%, rgba(255,255,255,0.5) 60.4%, transparent 62.4%), linear-gradient(118deg, rgba(255,255,255,0.98) 0%, rgba(240,253,244,0.96) 46%, rgba(187,247,208,0.8) 78%, rgba(255,251,235,0.92) 100%)",
+      borderColor: "rgba(22, 163, 74, 0.58)",
+      boxShadow: "0 21px 60px rgba(15,23,42,0.078), 0 0 44px rgba(34,197,94,0.18)"
     };
   }
 
   if (score >= 55) {
     return {
       background:
-        "radial-gradient(circle at 91% 54%, rgba(20,184,166,0.3) 0%, rgba(20,184,166,0.12) 28%, transparent 52%), radial-gradient(circle at 10% 0%, rgba(251,191,36,0.14) 0%, transparent 34%), linear-gradient(112deg, transparent 0%, transparent 62%, rgba(255,255,255,0.4) 62.4%, transparent 64.4%), linear-gradient(118deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.94) 50%, rgba(204,251,241,0.66) 100%)",
-      borderColor: "rgba(20, 184, 166, 0.42)",
-      boxShadow: "0 18px 50px rgba(15,23,42,0.064), 0 0 34px rgba(20,184,166,0.1)"
+        "radial-gradient(circle at 91% 54%, rgba(15,118,110,0.38) 0%, rgba(45,212,191,0.14) 29%, transparent 54%), radial-gradient(circle at 10% 0%, rgba(245,158,11,0.12) 0%, transparent 34%), linear-gradient(112deg, transparent 0%, transparent 63%, rgba(255,255,255,0.38) 63.4%, transparent 65.2%), linear-gradient(118deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.95) 50%, rgba(204,251,241,0.74) 100%)",
+      borderColor: "rgba(15, 118, 110, 0.48)",
+      boxShadow: "0 19px 52px rgba(15,23,42,0.068), 0 0 36px rgba(20,184,166,0.13)"
     };
   }
 
   return {
     background:
-      "radial-gradient(circle at 91% 54%, rgba(34,197,94,0.24) 0%, rgba(34,197,94,0.08) 29%, transparent 52%), radial-gradient(circle at 12% 0%, rgba(251,191,36,0.1) 0%, transparent 34%), linear-gradient(112deg, transparent 0%, transparent 63%, rgba(255,255,255,0.36) 63.4%, transparent 65.4%), linear-gradient(118deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.96) 52%, rgba(220,252,231,0.64) 100%)",
-    borderColor: "rgba(34, 197, 94, 0.3)",
-    boxShadow: "0 18px 48px rgba(15,23,42,0.06), 0 0 30px rgba(34,197,94,0.08)"
+      "radial-gradient(circle at 91% 54%, rgba(34,197,94,0.28) 0%, rgba(34,197,94,0.1) 30%, transparent 54%), radial-gradient(circle at 12% 0%, rgba(251,191,36,0.1) 0%, transparent 34%), linear-gradient(112deg, transparent 0%, transparent 64%, rgba(255,255,255,0.34) 64.4%, transparent 66%), linear-gradient(118deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.96) 54%, rgba(220,252,231,0.7) 100%)",
+    borderColor: "rgba(34, 197, 94, 0.34)",
+    boxShadow: "0 18px 48px rgba(15,23,42,0.06), 0 0 30px rgba(34,197,94,0.09)"
   };
 }
 
