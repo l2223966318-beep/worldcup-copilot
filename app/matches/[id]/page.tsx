@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -20,14 +20,13 @@ import { reviewRisk } from "@/lib/ai/risk";
 import { extractMatchSignals, type MatchSignal } from "@/lib/ai/signals";
 import { generateTopics, type TopicIdea } from "@/lib/ai/topics";
 import { copyToClipboard, downloadTextFile } from "@/lib/download";
-import { HOT_RADAR_CACHE_KEY, type HotRadarCache } from "@/lib/hot/hotTopicWorkflow";
-import type { HotItem, HotSearchPayload, HotTopic } from "@/lib/hot/types";
+import type { HotItem, HotSearchPayload } from "@/lib/hot/types";
 import { analyzeMatch, getMatchDetail } from "@/lib/project-api";
 import { createRuleBasedAnalysis } from "@/lib/services/analysisService";
 import { contentTypeOptions, createPlatformDraft, topicModeOptions, type ContentTypeKey, type TopicModeKey } from "@/lib/services/contentService";
 import { createContentPackage, createPackageMarkdown, createPackageText } from "@/lib/services/exportService";
 import { localizeMatchStatus, localizeRoundName, localizeTeamName, localizeVenueText } from "@/lib/services/footballNames";
-import { buildDraftReviewFlow, buildMatchHotspotShortlist, mergeHotSearchPayloads, type DraftReviewFlow } from "@/lib/services/matchDetailPresentation";
+import { buildDraftReviewFlow, buildMatchHotspotShortlist, mergeHotSearchPayloads, type DraftReviewFlow, type MatchHotspot } from "@/lib/services/matchDetailPresentation";
 import { appendHistoryRecord, writeReviewDraft, writeWorkflowState } from "@/lib/services/workflowStore";
 import { worldCupMatchToMatchData } from "@/lib/sports/adapters";
 import { useWorldCupQuery } from "@/lib/sports/client";
@@ -83,7 +82,6 @@ const platformMeta: Record<PlatformKey, { title: string; positioning: string; ac
 
 export default function MatchAnalysisPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
   const fixtureId = params.id;
   const { payload, loading, error } = useWorldCupQuery<WorldCupMatch>(
     `/api/worldcup/matches/${fixtureId}`,
@@ -120,6 +118,7 @@ export default function MatchAnalysisPage() {
   const [hotspotLoading, setHotspotLoading] = useState(false);
   const [hotspotError, setHotspotError] = useState("");
   const [draftForReview, setDraftForReview] = useState("");
+  const [selectedHotspotId, setSelectedHotspotId] = useState("");
 
   const localContent = useMemo(() => generatePlatformContent(match, selectedTopic), [match, selectedTopic]);
   const content = useMemo(() => {
@@ -135,21 +134,22 @@ export default function MatchAnalysisPage() {
     () => buildMatchContext(match, matchSignals, payload?.sourceStatus ?? "fallback"),
     [match, matchSignals, payload?.sourceStatus]
   );
-  const workflowTopic = useMemo(() => topicToWorkflowTopic(selectedTopic), [selectedTopic]);
   const platformDecisions = useMemo(() => buildPlatformDecisions(match, matchSignals, selectedTopic), [match, matchSignals, selectedTopic]);
-  const activeWorkflowDraft = useMemo(
-    () => manualDraft ?? createPlatformDraft(toWorkflowPlatform(activePlatform), matchContext, workflowTopic, manualAnalysis ?? createRuleBasedAnalysis(matchContext), { contentType: activeContentType, topicMode: activeTopicMode }),
-    [activeContentType, activePlatform, activeTopicMode, manualAnalysis, manualDraft, matchContext, workflowTopic]
-  );
-  const reviewSourceText = draftForReview.trim() || getPublishableDraftText(activeWorkflowDraft);
-  const reviewResult = useMemo(() => reviewRisk(reviewSourceText), [reviewSourceText]);
-  const localReviewFlow = useMemo(() => buildDraftReviewFlow(reviewSourceText, match, reviewResult), [match, reviewResult, reviewSourceText]);
-  const reviewFlow = aiReviewFlow ?? localReviewFlow;
-  const markdown = useMemo(() => buildMarkdown(match.name, selectedTopic, content, reviewFlow.result.advice), [content, match.name, reviewFlow.result.advice, selectedTopic]);
   const matchHotspots = useMemo(
     () => buildMatchHotspotShortlist({ match, signals: matchSignals, hotItems: matchHotItems }),
     [match, matchHotItems, matchSignals]
   );
+  const selectedHotspot = matchHotspots.find((hotspot) => hotspot.id === selectedHotspotId) ?? matchHotspots[0] ?? null;
+  const workflowTopic = useMemo(
+    () => selectedHotspot ? hotspotToWorkflowTopic(selectedHotspot, activeTopicMode) : topicToWorkflowTopic(selectedTopic),
+    [activeTopicMode, selectedHotspot, selectedTopic]
+  );
+  const activeWorkflowDraft = manualDraft;
+  const reviewSourceText = draftForReview.trim();
+  const reviewResult = useMemo(() => reviewSourceText ? reviewRisk(reviewSourceText) : null, [reviewSourceText]);
+  const localReviewFlow = useMemo(() => reviewSourceText && reviewResult ? buildDraftReviewFlow(reviewSourceText, match, reviewResult) : null, [match, reviewResult, reviewSourceText]);
+  const reviewFlow = aiReviewFlow ?? localReviewFlow;
+  const markdown = useMemo(() => buildMarkdown(match.name, selectedTopic, content, reviewFlow?.result.advice ?? "待审核"), [content, match.name, reviewFlow?.result.advice, selectedTopic]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -227,6 +227,16 @@ export default function MatchAnalysisPage() {
   }, [selectedTopicId, topics]);
 
   useEffect(() => {
+    if (!matchHotspots.length) {
+      setSelectedHotspotId("");
+      return;
+    }
+    if (!matchHotspots.some((hotspot) => hotspot.id === selectedHotspotId)) {
+      setSelectedHotspotId(matchHotspots[0].id);
+    }
+  }, [matchHotspots, selectedHotspotId]);
+
+  useEffect(() => {
     writeWorkflowState({
       currentMatch: matchContext,
       selectedTopic: workflowTopic,
@@ -268,6 +278,10 @@ export default function MatchAnalysisPage() {
   }
 
   async function handleGeneratePlatformDraft() {
+    if (!selectedHotspot) {
+      showWorkflowNotice("请先选择一个热点。");
+      return;
+    }
     const analysisSnapshot = manualAnalysis ?? createRuleBasedAnalysis(matchContext);
     const fallbackDraft = createPlatformDraft(toWorkflowPlatform(activePlatform), matchContext, workflowTopic, analysisSnapshot, { contentType: activeContentType, topicMode: activeTopicMode });
     setDraftLoading(true);
@@ -295,7 +309,6 @@ export default function MatchAnalysisPage() {
 
     setManualAnalysis(analysisSnapshot);
     setManualDraft(draft);
-    setDraftForReview(getPublishableDraftText(draft));
     setAiReviewFlow(null);
     writeWorkflowState({
       currentMatch: matchContext,
@@ -308,12 +321,19 @@ export default function MatchAnalysisPage() {
   }
 
   async function handleAiReview() {
+    if (!reviewSourceText) {
+      showWorkflowNotice("请先输入稿件，或读取当前生成稿件。");
+      return;
+    }
+    if (!activeWorkflowDraft) {
+      showWorkflowNotice("请先生成平台内容，或手动输入待审稿件。");
+    }
     writeReviewDraft(reviewSourceText);
     writeWorkflowState({
       currentMatch: matchContext,
       selectedTopic: workflowTopic,
-      selectedPlatform: activeWorkflowDraft.platform,
-      generatedContent: { ...activeWorkflowDraft, body: reviewSourceText }
+      selectedPlatform: activeWorkflowDraft?.platform ?? toWorkflowPlatform(activePlatform),
+      generatedContent: activeWorkflowDraft ? { ...activeWorkflowDraft, body: reviewSourceText } : undefined
     });
 
     setReviewLoading(true);
@@ -338,9 +358,9 @@ export default function MatchAnalysisPage() {
         setAiReviewFlow({
           draft: reviewSourceText,
           result: payload.result,
-          riskPoints: payload.riskPoints?.length ? payload.riskPoints : localReviewFlow.riskPoints,
-          rewriteSuggestion: payload.rewriteSuggestion || localReviewFlow.rewriteSuggestion,
-          checklist: payload.checklist?.length ? payload.checklist : localReviewFlow.checklist
+          riskPoints: payload.riskPoints?.length ? payload.riskPoints : localReviewFlow?.riskPoints ?? [],
+          rewriteSuggestion: payload.rewriteSuggestion || localReviewFlow?.rewriteSuggestion || reviewSourceText,
+          checklist: payload.checklist?.length ? payload.checklist : localReviewFlow?.checklist ?? []
         });
       } else {
         setAiReviewFlow(null);
@@ -353,41 +373,15 @@ export default function MatchAnalysisPage() {
   }
 
   function openHotspotWorkflow(hotspot: ReturnType<typeof buildMatchHotspotShortlist>[number]) {
-    if (typeof window !== "undefined") {
-      const topic: HotTopic = {
-        id: hotspot.id,
-        rank: hotspot.rank,
-        title: hotspot.title,
-        summary: hotspot.summary,
-        heat: hotspot.heat,
-        platform: hotspot.platform,
-        source: hotspot.source,
-        valueScore: hotspot.valueScore,
-        relevanceScore: hotspot.valueScore,
-        leverageValue: hotspot.valueScore >= 75 ? "高价值" : "可观察",
-        tags: [match.teamA, match.teamB, match.stage, "比赛详情页"],
-        updatedAt: new Date().toISOString(),
-        url: hotspot.url,
-        relatedMatches: [match.name],
-        contentAngles: [
-          `从“${hotspot.title}”切入，先确认热点来源，再回到${match.teamA} vs ${match.teamB}的比赛事实。`,
-          "生成内容前先拆清：已知事实、待核验信息、平台适配和风险边界。"
-        ]
-      };
-      const cached = readHotRadarCache();
-      const topics = [topic, ...(cached?.topics ?? []).filter((item) => item.id !== topic.id)];
-      const nextCache: HotRadarCache = {
-        topics,
-        lastUpdatedAt: new Date().toISOString(),
-        sourceStatus: cached?.sourceStatus ?? "cache",
-        message: "来自比赛详情页热点短榜。"
-      };
-      window.localStorage.setItem(HOT_RADAR_CACHE_KEY, JSON.stringify(nextCache));
-    }
-    router.push(`/hot-topics/${encodeURIComponent(hotspot.id)}?mode=generate`);
+    setSelectedHotspotId(hotspot.id);
+    setManualDraft(null);
+    setDraftForReview("");
+    setAiReviewFlow(null);
+    document.getElementById("platform-output")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function buildCurrentPackage() {
+    if (!activeWorkflowDraft || !reviewFlow) return null;
     const analysisSnapshot = manualAnalysis ?? createRuleBasedAnalysis(matchContext);
     return createContentPackage({
       matchContext,
@@ -462,7 +456,7 @@ export default function MatchAnalysisPage() {
         </div>
       </section>
 
-      <section className="rounded-[32px] border bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.06)]" style={{ borderColor: theme.border }}>
+      <section id="platform-output" className="scroll-mt-24 rounded-[32px] border bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.06)]" style={{ borderColor: theme.border }}>
         <SectionTitle eyebrow="PLATFORM OUTPUT" title="多平台分发工作台" />
         {workflowNotice ? <p className="mt-3 text-sm font-semibold text-emerald-700">{workflowNotice}</p> : null}
         <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -486,13 +480,13 @@ export default function MatchAnalysisPage() {
           className="mt-5"
           platform={activePlatform}
           draft={manualDraft}
-          topics={topics}
-          selectedTopicId={selectedTopic.id}
+          hotspots={matchHotspots}
+          selectedHotspotId={selectedHotspot?.id ?? ""}
           contentType={activeContentType}
           topicMode={activeTopicMode}
           draftLoading={draftLoading}
-          onTopicChange={(topicId) => {
-            setSelectedTopicId(topicId);
+          onHotspotChange={(hotspotId) => {
+            setSelectedHotspotId(hotspotId);
             setManualDraft(null);
             setDraftForReview("");
             setAiReviewFlow(null);
@@ -513,6 +507,10 @@ export default function MatchAnalysisPage() {
           copied={copied}
           onCopy={handleCopy}
           onExport={() => {
+            if (!activeWorkflowDraft) {
+              showWorkflowNotice("请先生成平台内容。");
+              return;
+            }
             appendHistoryRecord({
               kind: "workflow",
               matchId: match.id,
@@ -544,7 +542,7 @@ export default function MatchAnalysisPage() {
               </ActionButton>
             </div>
             <textarea
-              value={reviewSourceText}
+              value={draftForReview}
               onChange={(event) => {
                 setDraftForReview(event.target.value);
                 setAiReviewFlow(null);
@@ -553,25 +551,30 @@ export default function MatchAnalysisPage() {
             />
             <div className="mt-4 flex flex-wrap gap-2">
               <ActionButton onClick={() => {
+                if (!activeWorkflowDraft) {
+                  showWorkflowNotice("请先生成平台内容。");
+                  return;
+                }
                 setDraftForReview(getPublishableDraftText(activeWorkflowDraft));
                 setAiReviewFlow(null);
               }} theme={theme} variant="secondary">
                 读取当前生成稿件
               </ActionButton>
               <ActionButton onClick={() => {
+                if (!reviewFlow) return;
                 setDraftForReview(reviewFlow.rewriteSuggestion);
                 setAiReviewFlow(null);
               }} theme={theme}>
                 应用改写建议
               </ActionButton>
-              <ActionButton onClick={() => handleCopy("review-rewrite", reviewFlow.rewriteSuggestion)} theme={theme} variant="secondary">
+              <ActionButton onClick={() => reviewFlow && handleCopy("review-rewrite", reviewFlow.rewriteSuggestion)} theme={theme} variant="secondary">
                 <Clipboard className="h-4 w-4" />
                 {copied === "review-rewrite" ? "已复制" : "复制改写"}
               </ActionButton>
             </div>
           </div>
           <div className="space-y-4">
-            <div className="rounded-[28px] border bg-white p-5" style={{ borderColor: theme.border }}>
+            {reviewFlow ? <div className="rounded-[28px] border bg-white p-5" style={{ borderColor: theme.border }}>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full px-3 py-1 text-xs font-black text-white" style={{ backgroundColor: reviewFlow.result.level === "高" ? "#e11d48" : reviewFlow.result.level === "中" ? "#d97706" : theme.primary }}>
                   {reviewFlow.result.level}风险
@@ -587,12 +590,12 @@ export default function MatchAnalysisPage() {
                   </div>
                 ))}
               </div>
-            </div>
-            <div className="rounded-[28px] border bg-white p-5" style={{ borderColor: theme.border }}>
+            </div> : null}
+            {reviewFlow ? <div className="rounded-[28px] border bg-white p-5" style={{ borderColor: theme.border }}>
               <h3 className="text-xl font-semibold text-slate-950">改写建议</h3>
               <ReadableTextBlock text={reviewFlow.rewriteSuggestion} className="mt-3 rounded-2xl bg-emerald-50/60 p-4" />
-            </div>
-            <div className="rounded-[28px] border bg-white p-5" style={{ borderColor: theme.border }}>
+            </div> : null}
+            {reviewFlow ? <div className="rounded-[28px] border bg-white p-5" style={{ borderColor: theme.border }}>
               <h3 className="text-xl font-semibold text-slate-950">发布前检查</h3>
               <div className="mt-3 space-y-2">
                 {reviewFlow.checklist.map((item) => (
@@ -602,7 +605,7 @@ export default function MatchAnalysisPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </div> : null}
           </div>
         </div>
       </section>
@@ -992,12 +995,12 @@ function PlatformPreview({
   className,
   platform,
   draft,
-  topics,
-  selectedTopicId,
+  hotspots,
+  selectedHotspotId,
   contentType,
   topicMode,
   draftLoading,
-  onTopicChange,
+  onHotspotChange,
   onContentTypeChange,
   onTopicModeChange,
   theme,
@@ -1009,12 +1012,12 @@ function PlatformPreview({
   className?: string;
   platform: PlatformKey;
   draft: PlatformDraft | null;
-  topics: TopicIdea[];
-  selectedTopicId: string;
+  hotspots: MatchHotspot[];
+  selectedHotspotId: string;
   contentType: ContentTypeKey;
   topicMode: TopicModeKey;
   draftLoading: boolean;
-  onTopicChange: (topicId: string) => void;
+  onHotspotChange: (hotspotId: string) => void;
   onContentTypeChange: (type: ContentTypeKey) => void;
   onTopicModeChange: (mode: TopicModeKey) => void;
   theme: SportTheme;
@@ -1052,15 +1055,15 @@ function PlatformPreview({
       </div>
       <div className="mt-5 grid gap-3 md:grid-cols-3">
         <label className="text-sm font-semibold text-slate-600">
-          选题
+          热点
           <select
-            value={selectedTopicId}
-            onChange={(event) => onTopicChange(event.target.value)}
+            value={selectedHotspotId}
+            onChange={(event) => onHotspotChange(event.target.value)}
             className="mt-2 h-11 w-full rounded-2xl border border-emerald-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-emerald-400"
           >
-            {topics.map((topic) => (
-              <option key={topic.id} value={topic.id}>{topic.title}</option>
-            ))}
+            {hotspots.length ? hotspots.map((hotspot) => (
+              <option key={hotspot.id} value={hotspot.id}>{hotspot.title}</option>
+            )) : <option value="">暂无可选热点</option>}
           </select>
         </label>
         <label className="text-sm font-semibold text-slate-600">
@@ -1378,6 +1381,19 @@ function topicToWorkflowTopic(topic: TopicIdea): WorkflowTopic {
   };
 }
 
+function hotspotToWorkflowTopic(hotspot: MatchHotspot, topicMode: TopicModeKey): WorkflowTopic {
+  const modeLabel = topicModeOptions.find((item) => item.key === topicMode)?.label ?? "选题";
+  return {
+    id: `hotspot-${hotspot.id}`,
+    title: hotspot.title,
+    category: modeLabel,
+    coreAngle: hotspot.summary,
+    reason: hotspot.matchReason || `围绕${hotspot.title}生成内容。`,
+    riskLevel: hotspot.source === "场上事件" ? "低" : "中",
+    recommendedFormat: hotspot.platform || "B站"
+  };
+}
+
 function toWorkflowPlatform(platform: PlatformKey) {
   return platform === "douyin" ? "douyin" : platform;
 }
@@ -1423,16 +1439,6 @@ async function fetchHotPayload(url: string, signal: AbortSignal, headers?: Recor
     throw new Error(payload?.message || `热点接口请求失败：${response.status}`);
   }
   return payload;
-}
-
-function readHotRadarCache(): HotRadarCache | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(HOT_RADAR_CACHE_KEY);
-    return raw ? (JSON.parse(raw) as HotRadarCache) : null;
-  } catch {
-    return null;
-  }
 }
 
 function getPlatformPreview(platform: PlatformKey, content: PlatformContent) {

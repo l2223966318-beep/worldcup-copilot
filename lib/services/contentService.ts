@@ -43,7 +43,7 @@ export function createPlatformDraft(
   const sections = contentType === "videoScript"
     ? factory(matchContext, topic, analysis)
     : createTypedSections(platform, matchContext, topic, analysis, contentType, topicMode);
-  const title = cleanTitle(sections[0]?.content.split("\n")[0] || `${topic.title} - ${platformLabel(platform)}`, toTone(platform));
+  const title = createDraftTitle(topic, sections[0]?.content.split("\n")[0], platform);
 
   return {
     id: `${matchContext.id}-${topic.id}-${platform}-${Date.now()}`,
@@ -53,6 +53,18 @@ export function createPlatformDraft(
     sections,
     createdAt: new Date().toISOString()
   };
+}
+
+function createDraftTitle(topic: WorkflowTopic, firstLine: string | undefined, platform: PlatformKey) {
+  const source = topic.title || firstLine || `${platformLabel(platform)}内容`;
+  const title = source
+    .replace(/^#/, "")
+    .replace(/^(选题|标题)[:：]\s*/, "")
+    .replace(/[。！？?！]+$/g, "")
+    .trim();
+
+  if (!title) return `${platformLabel(platform)}内容`;
+  return title.length > 34 ? `${title.slice(0, 34)}...` : title;
 }
 
 function createTypedSections(
