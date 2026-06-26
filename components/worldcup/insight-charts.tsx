@@ -37,6 +37,7 @@ export function InsightCharts({ match, theme = getSportTheme("football") }: { ma
   ];
   const teamRadar = buildTeamRadarData(match);
   const chartCopy = buildChartCopy(match);
+  const hasEnoughHistory = match.historicalMeetings.length >= 2;
   const historyData = match.historicalMeetings.map((item, index) => ({
     name: item.year,
     场次: index + 1
@@ -139,16 +140,64 @@ export function InsightCharts({ match, theme = getSportTheme("football") }: { ma
         quote={chartCopy.context.quote}
         theme={theme}
       >
-        <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={historyData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,.22)" />
-            <XAxis dataKey="name" stroke="#64748b" />
-            <YAxis stroke="#64748b" />
-            <Tooltip />
-            <Line type="monotone" dataKey="场次" stroke={theme.chartB} strokeWidth={3} dot={{ r: 5, fill: theme.chartB }} />
-          </LineChart>
-        </ResponsiveContainer>
+        {hasEnoughHistory ? (
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={historyData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,.22)" />
+              <XAxis dataKey="name" stroke="#64748b" />
+              <YAxis stroke="#64748b" />
+              <Tooltip />
+              <Line type="monotone" dataKey="场次" stroke={theme.chartB} strokeWidth={3} dot={{ r: 5, fill: theme.chartB }} />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <MatchContextFallback match={match} theme={theme} />
+        )}
       </ChartCard>
+    </div>
+  );
+}
+
+function MatchContextFallback({ match, theme }: { match: MatchData; theme: SportTheme }) {
+  const eventCount = match.keyEvents.filter((event) => event.team !== "数据源").length;
+  const statSignals = [
+    `${match.teamA} 控球 ${match.stats.teamA.possession}%`,
+    `${match.teamB} 控球 ${match.stats.teamB.possession}%`,
+    `射门 ${match.stats.teamA.shots}-${match.stats.teamB.shots}`,
+    `射正 ${match.stats.teamA.shotsOnTarget}-${match.stats.teamB.shotsOnTarget}`
+  ];
+
+  return (
+    <div className="min-h-[250px] rounded-[24px] border bg-white p-5" style={{ borderColor: theme.border }}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-xs font-black tracking-[0.18em] text-slate-400">CONTEXT</div>
+          <div className="mt-2 text-xl font-black text-slate-950">背景数据不足</div>
+        </div>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">未返回历史交锋</span>
+      </div>
+      <p className="mt-4 text-sm leading-7 text-slate-600">
+        当前数据源没有提供两条以上可核验的历史背景记录，因此不展示趋势图。内容判断应优先使用本场比分、赛程阶段、事件和基础统计。
+      </p>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <ContextMetric label="本场比分" value={match.score} />
+        <ContextMetric label="关键事件" value={eventCount ? `${eventCount} 条` : "待补充"} />
+        {statSignals.slice(0, 2).map((item) => (
+          <ContextMetric key={item} label="基础统计" value={item} />
+        ))}
+      </div>
+      <div className="mt-4 rounded-2xl p-3 text-sm leading-6" style={{ backgroundColor: theme.background, color: theme.secondary }}>
+        可讲方向：先把这场比赛本身讲清楚，不补写未经核验的历史交锋、伤病、内部矛盾或裁判争议。
+      </div>
+    </div>
+  );
+}
+
+function ContextMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <div className="text-xs font-semibold text-slate-400">{label}</div>
+      <div className="mt-1 text-sm font-black text-slate-900">{value}</div>
     </div>
   );
 }

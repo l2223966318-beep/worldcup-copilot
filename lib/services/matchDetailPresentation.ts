@@ -149,10 +149,16 @@ export function buildChartCopy(match: MatchData) {
       operation: `雷达把${match.teamA}和${match.teamB}放在同一张图里：控球、射门、射正、角球看进攻，纪律看风险边界。它适合替代“谁表现更好”的空泛判断。`,
       quote: `把两队放在同一张雷达里，运营才能看清是${match.teamA}在压制，还是${match.teamB}在用效率回应。`
     },
-    context: {
-      operation: `${match.name}有 ${match.historicalMeetings.length} 条可用背景记录，当前关键事件是“${keyEventText}”。长文或 B站中段可以用背景补足语境，但不要让历史信息盖过本场事实。`,
-      quote: `历史背景只负责垫高语境，真正决定这场内容怎么讲的，还是本场比分、事件和数据。`
-    }
+    context:
+      match.historicalMeetings.length >= 2
+        ? {
+            operation: `${match.name}有 ${match.historicalMeetings.length} 条可用背景记录，当前关键事件是“${keyEventText}”。长文或 B站中段可以用背景补足语境，但不要让历史信息盖过本场事实。`,
+            quote: `历史背景只负责垫高语境，真正决定这场内容怎么讲的，还是本场比分、事件和数据。`
+          }
+        : {
+            operation: `${match.name}当前没有两条以上可核验的历史背景记录。内容上下文应回到本场事实：比分、阶段、关键事件和基础统计，不要把单场赛程包装成历史趋势。`,
+            quote: `背景数据不足时，最稳的讲法不是补历史，而是把本场比分、事件和数据讲清楚。`
+          }
   };
 }
 
