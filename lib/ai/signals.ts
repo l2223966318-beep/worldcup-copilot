@@ -123,7 +123,7 @@ const signalRules: SignalRule[] = [
     riskLevel: "低",
     recommendedPlatforms: ["短视频", "B站", "微博"],
     contentFormats: ["读秒转折短视频", "时间线复盘", "微博情绪快评"],
-    topicSeed: (match, event) => `${event.minute}这个瞬间值得单独复盘`,
+    topicSeed: (match, event) => buildEventTopicSeed(match, event),
     angleHints: ["时间线天然清晰", "适合强节奏口播", "可做情绪共鸣但别过度煽动"]
   },
   {
@@ -134,7 +134,7 @@ const signalRules: SignalRule[] = [
     riskLevel: "低",
     recommendedPlatforms: ["B站", "短视频"],
     contentFormats: ["门将单回合复盘", "防守责任拆解"],
-    topicSeed: (match, event) => `${event.team}门将这一回合，应该被责怪还是被理解？`,
+    topicSeed: (match, event) => buildEventTopicSeed(match, event),
     angleHints: ["拆动作不做人身攻击", "结合防线压力", "适合慢放复盘"]
   },
   {
@@ -145,7 +145,7 @@ const signalRules: SignalRule[] = [
     riskLevel: "低",
     recommendedPlatforms: ["短视频", "小红书", "B站"],
     contentFormats: ["点球心理解释", "新手看球科普", "B站心理博弈复盘"],
-    topicSeed: (match, event) => `点球为什么总能制造${match.name}的内容爆点？`,
+    topicSeed: (match, event) => buildEventTopicSeed(match, event),
     angleHints: ["心理压力强", "适合科普", "不要用单一回合否定球员"]
   },
   {
@@ -156,7 +156,7 @@ const signalRules: SignalRule[] = [
     riskLevel: "低",
     recommendedPlatforms: ["B站", "公众号", "微博"],
     contentFormats: ["人物叙事", "纪录解释", "赛后长文段落"],
-    topicSeed: (match, event) => `${event.team}这个里程碑，如何转成球员叙事？`,
+    topicSeed: (match, event) => buildEventTopicSeed(match, event),
     angleHints: ["适合人物线", "需要补充历史资料", "避免无来源纪录表述"]
   }
 ];
@@ -222,6 +222,55 @@ function eventToText(event: MatchEvent) {
   return [event.minute, event.team, event.type, event.description].filter(Boolean).join(" ");
 }
 
+function buildEventTopicSeed(match: MatchData, event: SignalSource) {
+  const description = cleanupEventDescription(event.text, event);
+  const player = extractPlayerName(description);
+  const minute = event.minute === "-" ? "" : event.minute;
+  const prefix = player ? player : event.team && event.team !== `${match.teamA}/${match.teamB}` ? event.team : match.name;
+
+  if (/扑救|门将|save/i.test(description)) {
+    return `${minute}${prefix}这次扑救，把悬念留到了最后`;
+  }
+
+  if (/扳平|追平/.test(description)) {
+    return `${minute}${prefix}追平后，比赛才真正开始`;
+  }
+
+  if (/反超|制胜|绝杀|读秒|补时|90\+|120\+/.test(description)) {
+    return `${minute}${prefix}这一脚，直接改写比赛结尾`;
+  }
+
+  if (/领先|取得领先|扩大优势/.test(description)) {
+    return `${minute}${prefix}进球后，比赛节奏变了`;
+  }
+
+  if (/点球/.test(description)) {
+    return `${minute}${prefix}点球这一刻，压力全写在细节里`;
+  }
+
+  return `${minute}${description.replace(/[。.!！?？]$/, "")}`;
+}
+
+function cleanupEventDescription(text: string, event: SignalSource) {
+  const knownTypes = ["关键扑救", "进球", "点球", "换人", "黄牌", "争议", "终场"];
+  return text
+    .replace(/^\s*(?:\d+(?:\+\d+)?'|点球)\s+/, "")
+    .replace(new RegExp(`^${escapeRegExp(event.team)}\\s+`), "")
+    .replace(new RegExp(`^(?:${knownTypes.map(escapeRegExp).join("|")})\\s+`), "")
+    .replace(/^\s*点球\s+/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function escapeRegExp(text: string) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractPlayerName(text: string) {
+  const match = text.match(/^([\u4e00-\u9fa5A-Za-z·\s]{2,18}?)(?:点球|完成|凌空|补射|反击|禁区|破门|扳回|扳平|追平|低射|头球|扑救)/);
+  return match?.[1].trim();
+}
+
 function dedupeSignals(signals: MatchSignal[]) {
   const seen = new Set<string>();
   return signals.filter((signal) => {
@@ -240,7 +289,12 @@ function buildFallbackSignals(match: MatchData): MatchSignal[] {
     minute: event.minute,
     team: event.team,
     evidence: event.description,
-    topicSeed: `${event.minute}这个关键事件，如何改变${match.name}的内容表达？`,
+    topicSeed: buildEventTopicSeed(match, {
+      minute: event.minute,
+      team: event.team,
+      text: eventToText(event),
+      index
+    }),
     contentValue: 62 - index * 4,
     riskLevel: "低",
     priority: index === 0 ? "secondary" : "watch",
