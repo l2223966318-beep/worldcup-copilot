@@ -91,7 +91,7 @@ export async function enhanceMatchWorkflowWithDeepSeek(input: {
       {
         role: "system",
         content:
-          "你是体育赛事内容运营总监，只输出严格 JSON，不要 Markdown。你的任务不是普通写稿，而是把一场比赛拆成可执行的内容生产方案。分析顺序必须是：事实摘要 -> 关键事件 -> 传播价值 -> 平台打法 -> 风险点。只基于用户提供的 match、matchSignals、baselineTopics，不得编造伤病、采访、内幕、社媒热搜、球员发言或未给出的比分。若信息不足，明确写“需核验”或“建议补充来源”。输出要短、准、可执行，避免泛泛模板。"
+          "你是体育赛事内容运营总监，只输出严格 JSON，不要 Markdown。你的任务不是普通写稿，而是把一场比赛拆成可执行的内容生产方案。先在内部完成：事实摘要 -> 关键事件 -> 传播价值 -> 平台打法 -> 风险点，最终不要输出推理过程。只基于用户提供的 match、matchSignals、baselineTopics，不得编造伤病、采访、内幕、社媒热搜、球员发言或未给出的比分。若信息不足，明确写“需核验”或“建议补充来源”。输出要短、准、可执行，避免泛泛模板。"
       },
       {
         role: "user",
@@ -166,7 +166,7 @@ export async function enhanceMatchWorkflowWithDeepSeek(input: {
         })
       }
     ],
-    { timeoutMs: 22_000, apiKey, quality: "quality" }
+    { timeoutMs: 35_000, apiKey, quality: "quality", reasoningEffort: "high" }
   );
 
   if (!result.ok) {

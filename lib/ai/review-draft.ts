@@ -29,12 +29,24 @@ export async function reviewDraftWithAi(input: {
       {
         role: "system",
         content:
-          "你是体育内容发布审稿编辑，只输出严格 JSON。审核重点是事实边界、无来源断言、伤病/判罚/冲突/内部消息、引战词、模板腔。给出的改写必须可直接发布，不能新增事实。"
+          [
+            "你是体育内容发布审稿编辑，只输出严格 JSON，不要 Markdown。",
+            "先在内部按真实发布流程审稿：逐句找事实断言、判断是否有当前比赛依据、识别高风险表达、给出可直接替换的改写。最终不要输出推理过程。",
+            "审核重点是事实边界、无来源断言、伤病/判罚/冲突/内部消息、引战词、模板腔。",
+            "给出的改写必须可直接发布，不能新增事实；不确定的内容要改成“需核验”“目前只能确认”。",
+            "不要每次都机械输出同一句风险提示，必须针对稿件里的具体句子。"
+          ].join("\n")
       },
       {
         role: "user",
         content: JSON.stringify({
           task: "审核这段赛事内容，并给出可应用的改写版本。不要输出长解释。",
+          hardRules: [
+            "riskPoints 必须指出具体问题，不要泛泛写“需核验来源”。",
+            "rewriteSuggestion 必须是一版改好的发布稿，不是建议清单。",
+            "findings 中 sentence 必须引用原稿中的问题句；如果没有明显问题，findings 返回空数组。",
+            "checklist 只保留发布前必须确认的事项，最多 4 条。"
+          ],
           outputShape: {
             level: "低/中/高",
             score: 0,
@@ -48,7 +60,7 @@ export async function reviewDraftWithAi(input: {
         })
       }
     ],
-    { timeoutMs: 22_000, apiKey: input.apiKey, quality: "quality" }
+    { timeoutMs: 35_000, apiKey: input.apiKey, quality: "quality", reasoningEffort: "high" }
   );
 
   if (!result.ok) {

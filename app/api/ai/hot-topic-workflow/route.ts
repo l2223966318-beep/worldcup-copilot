@@ -47,8 +47,8 @@ type AuditCacheEntry = {
 };
 
 const HOT_WORKFLOW_AI_CACHE_TTL_MS = Number(process.env.HOT_WORKFLOW_AI_CACHE_TTL_MS ?? 10 * 60_000);
-const HOT_WORKFLOW_GENERATE_TIMEOUT_MS = Number(process.env.HOT_WORKFLOW_GENERATE_TIMEOUT_MS ?? 20_000);
-const HOT_WORKFLOW_AUDIT_TIMEOUT_MS = Number(process.env.HOT_WORKFLOW_AUDIT_TIMEOUT_MS ?? 18_000);
+const HOT_WORKFLOW_GENERATE_TIMEOUT_MS = Number(process.env.HOT_WORKFLOW_GENERATE_TIMEOUT_MS ?? 35_000);
+const HOT_WORKFLOW_AUDIT_TIMEOUT_MS = Number(process.env.HOT_WORKFLOW_AUDIT_TIMEOUT_MS ?? 30_000);
 const generateCache = new Map<string, GenerateCacheEntry>();
 const auditCache = new Map<string, AuditCacheEntry>();
 
@@ -114,10 +114,12 @@ async function handleGenerate(topic: HotTopic, config: HotGenerationConfig, apiK
         role: "system",
         content: [
           "你是体育赛事内容运营编辑，只输出严格 JSON，不要 Markdown。",
+          "先在内部判断：热点事实是否足够、当前平台用户会关心什么、这个内容应该做成哪种可发布形态。最终不要输出推理过程。",
           "任务：基于一个热点生成可直接编辑发布的中文内容。",
           "硬规则：只能使用热点 title、summary、source、platform、url、category、valueScore、tags 和用户配置；不得编造比分、球员发言、伤病、判罚细节、官方结论。",
           "信息不足时必须写“需核实”或“目前只能确认存在讨论”。",
           "不同平台必须彻底分开写法，不共用同一套模板。",
+          "成稿要像真人运营会发的内容：开头有钩子，中段有信息，结尾有讨论或行动，但不要营销号腔。",
           platformInstruction(config),
           lengthInstruction(config),
           "最终只返回 {\"draft\":\"...\"}。"
@@ -134,7 +136,7 @@ async function handleGenerate(topic: HotTopic, config: HotGenerationConfig, apiK
         })
       }
     ],
-    { timeoutMs: HOT_WORKFLOW_GENERATE_TIMEOUT_MS, apiKey, quality: "quality" }
+    { timeoutMs: HOT_WORKFLOW_GENERATE_TIMEOUT_MS, apiKey, quality: "quality", reasoningEffort: "high" }
   );
 
   if (!result.ok) {
@@ -191,7 +193,7 @@ async function handleAudit(topic: HotTopic, config: HotGenerationConfig, draft: 
         })
       }
     ],
-    { timeoutMs: HOT_WORKFLOW_AUDIT_TIMEOUT_MS, apiKey, quality: "quality" }
+    { timeoutMs: HOT_WORKFLOW_AUDIT_TIMEOUT_MS, apiKey, quality: "quality", reasoningEffort: "high" }
   );
 
   if (!result.ok) {

@@ -22,7 +22,7 @@ type AiCacheEntry = {
 };
 
 const HOT_TOPIC_AI_CACHE_TTL_MS = Number(process.env.HOT_TOPIC_AI_CACHE_TTL_MS ?? 10 * 60_000);
-const HOT_TOPIC_AI_TIMEOUT_MS = Number(process.env.HOT_TOPIC_AI_TIMEOUT_MS ?? 12_000);
+const HOT_TOPIC_AI_TIMEOUT_MS = Number(process.env.HOT_TOPIC_AI_TIMEOUT_MS ?? 30_000);
 const aiCache = new Map<string, AiCacheEntry>();
 
 type HotTopicAiPayload = {
@@ -66,6 +66,7 @@ export async function POST(request: Request) {
           content:
             [
               "你是体育内容运营编辑总监，只输出严格 JSON，不要 Markdown。",
+              "先在内部判断：热点是否真和足球/当前比赛相关、可写信息有哪些、哪些必须核验。最终不要输出推理过程。",
               "任务：把热点分析写成短、准、可执行的运营判断，不要空话。",
               "分析顺序必须是：发生了什么 → 为什么值得做 → 和比赛/足球关系 → 可产出什么 → 需核验什么。",
               "只能基于热点 title、summary、source、platform、valueScore、category、tags、url 判断；不得编造比分、球员发言、比赛细节、官方结论。",
@@ -93,7 +94,7 @@ export async function POST(request: Request) {
           })
         }
       ],
-      { timeoutMs: HOT_TOPIC_AI_TIMEOUT_MS, apiKey: body.apiKey, quality: "quality" }
+      { timeoutMs: HOT_TOPIC_AI_TIMEOUT_MS, apiKey: body.apiKey, quality: "quality", reasoningEffort: "high" }
     );
 
     if (!result.ok) {
