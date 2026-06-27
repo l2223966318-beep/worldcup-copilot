@@ -30,8 +30,8 @@ const defaultConfig: HotGenerationConfig = {
 };
 
 const platforms: HotGenerationConfig["platform"][] = ["B站", "微博", "小红书", "抖音", "通用"];
-const contentTypes: HotGenerationConfig["contentType"][] = ["选题", "标题", "短文案", "视频脚本", "评论区互动问题", "图文卡片结构"];
-const tones: HotGenerationConfig["tone"][] = ["客观资讯", "球迷讨论", "轻松整活", "专业分析"];
+const contentTypes: HotGenerationConfig["contentType"][] = ["选题", "标题", "短文案", "视频脚本", "评论区互动", "图文卡片"];
+const tones: HotGenerationConfig["tone"][] = ["专业复盘", "客观资讯", "球迷讨论", "轻松整活", "人物故事", "数据解读", "稳妥表达"];
 const lengths: HotGenerationConfig["length"][] = ["短", "中", "长"];
 const SETTINGS_STORAGE_KEY = "worldcup.datasource.settings";
 const HOT_TOPIC_ANALYSIS_CACHE_KEY = "worldcup.hot-topic-analysis.v1";
@@ -146,6 +146,12 @@ export default function HotTopicDetailPage() {
 
   function updateConfig<Key extends keyof HotGenerationConfig>(key: Key, value: HotGenerationConfig[Key]) {
     setConfig((current) => ({ ...current, [key]: value }));
+    setDraft("");
+    setContentStatus("idle");
+    setContentMessage("");
+    setAudit(null);
+    setAuditStatus("idle");
+    setAuditMessage("");
   }
 
   async function generateDraft() {
@@ -208,11 +214,11 @@ export default function HotTopicDetailPage() {
         audit?: HotAuditResult;
         message?: string;
       };
-      setAudit(payload.audit || auditHotDraft(draft, topic, config.platform));
+      setAudit(payload.audit || auditHotDraft(draft, topic, config.platform, config.contentType));
       setAuditStatus(payload.sourceStatus === "live" ? "live" : payload.sourceStatus === "fallback" ? "fallback" : "error");
       setAuditMessage(payload.message || "");
     } catch (error) {
-      setAudit(auditHotDraft(draft, topic, config.platform));
+      setAudit(auditHotDraft(draft, topic, config.platform, config.contentType));
       setAuditStatus("error");
       setAuditMessage(error instanceof Error ? error.message : "内容审核失败。");
     }
@@ -325,8 +331,8 @@ export default function HotTopicDetailPage() {
         <h2 className="mt-2 text-3xl font-black text-slate-950">内容生成配置</h2>
         <div className="mt-5 grid gap-4 lg:grid-cols-3">
           <SelectField label="平台" value={config.platform} options={platforms} onChange={(value) => updateConfig("platform", value as HotGenerationConfig["platform"])} />
-          <SelectField label="内容类型" value={config.contentType} options={contentTypes} onChange={(value) => updateConfig("contentType", value as HotGenerationConfig["contentType"])} />
-          <SelectField label="语气" value={config.tone} options={tones} onChange={(value) => updateConfig("tone", value as HotGenerationConfig["tone"])} />
+          <SelectField label="生成类型" value={config.contentType} options={contentTypes} onChange={(value) => updateConfig("contentType", value as HotGenerationConfig["contentType"])} />
+          <SelectField label="风格类型" value={config.tone} options={tones} onChange={(value) => updateConfig("tone", value as HotGenerationConfig["tone"])} />
           <SelectField label="长度" value={config.length} options={lengths} onChange={(value) => updateConfig("length", value as HotGenerationConfig["length"])} />
           <ToggleField label="引用比赛事实" checked={config.useMatchFacts} onChange={(value) => updateConfig("useMatchFacts", value)} />
           <ToggleField label="加入风险提醒" checked={config.includeRiskReminder} onChange={(value) => updateConfig("includeRiskReminder", value)} />
@@ -367,6 +373,8 @@ export default function HotTopicDetailPage() {
             onChange={(event) => {
               setDraft(event.target.value);
               setAudit(null);
+              setAuditStatus("idle");
+              setAuditMessage("");
             }}
             placeholder="点击“生成内容”后，结果会出现在这里。你也可以直接粘贴或手动编辑文案，再一键审核。"
             className="mt-5 min-h-[320px] w-full rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-700 outline-none transition focus:border-emerald-300 focus:bg-white"
@@ -391,21 +399,23 @@ export default function HotTopicDetailPage() {
               <DetailBlock title="传播伦理审核" items={audit.ethics} />
               <DetailBlock title="平台适配审核" items={audit.platformFit} />
               <DetailBlock title="修改建议" items={audit.suggestions} />
-              <div className="rounded-[22px] border border-emerald-100 bg-emerald-50 p-4">
-                <div className="text-xs font-black tracking-[0.14em] text-emerald-700">可应用改写</div>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">{audit.rewriteSuggestion}</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDraft(audit.rewriteSuggestion);
-                    setAudit(null);
-                  }}
-                  className="mt-3 inline-flex h-10 items-center gap-2 rounded-full bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:-translate-y-0.5"
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                  应用建议
-                </button>
-              </div>
+              {audit.level !== "pass" ? (
+                <div className="rounded-[22px] border border-emerald-100 bg-emerald-50 p-4">
+                  <div className="text-xs font-black tracking-[0.14em] text-emerald-700">可应用改写</div>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">{audit.rewriteSuggestion}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraft(audit.rewriteSuggestion);
+                      setAudit(null);
+                    }}
+                    className="mt-3 inline-flex h-10 items-center gap-2 rounded-full bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:-translate-y-0.5"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    应用建议
+                  </button>
+                </div>
+              ) : null}
             </div>
           ) : (
             <p className="mt-5 rounded-[22px] border border-dashed border-slate-200 bg-slate-50 p-6 text-sm leading-7 text-slate-500">

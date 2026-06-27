@@ -22,7 +22,7 @@ for (const file of files) {
   writeFileSync(targetPath, compiled, "utf8");
 }
 
-const { auditHotDraft } = await import(`file:///${join(outDir, "lib/hot/hotTopicWorkflow.mjs").replaceAll("\\", "/")}`);
+const { auditHotDraft, generateHotDraft } = await import(`file:///${join(outDir, "lib/hot/hotTopicWorkflow.mjs").replaceAll("\\", "/")}`);
 
 const topic = {
   id: "hot-1",
@@ -41,11 +41,50 @@ const safeDraft = [
 ].join("\n");
 const safeAudit = auditHotDraft(safeDraft, topic, "抖音");
 assert.equal(safeAudit.level, "pass");
-assert.ok(!safeAudit.authenticity.some((item) => item.includes("存在确定性表述")));
+assert.deepEqual(safeAudit.authenticity, []);
+assert.deepEqual(safeAudit.risk, []);
+assert.deepEqual(safeAudit.ethics, []);
+assert.deepEqual(safeAudit.suggestions, []);
+assert.equal(safeAudit.rewriteSuggestion, safeDraft);
+
+const safeTitleAudit = auditHotDraft("1. C罗首发讨论，焦点不只一个", topic, "B站", "标题");
+assert.equal(safeTitleAudit.level, "pass");
+assert.deepEqual(safeTitleAudit.platformFit, []);
 
 const riskyAudit = auditHotDraft("官方证实他已经确认伤退，这事已经实锤。", topic, "微博");
 assert.notEqual(riskyAudit.level, "pass");
-assert.ok(riskyAudit.authenticity.some((item) => item.includes("存在确定性表述")));
-assert.ok(riskyAudit.risk.some((item) => item.includes("高风险")));
+assert.ok(riskyAudit.authenticity.some((item) => item.includes("确定性表述")));
+assert.ok(riskyAudit.risk.some((item) => item.includes("确认伤退")));
+assert.ok(!riskyAudit.suggestions.some((item) => item === "补充来源链接或注明“需人工核验”。"));
+
+const topicDraft = generateHotDraft(topic, {
+  platform: "B站",
+  contentType: "选题",
+  tone: "轻松整活",
+  length: "中",
+  useMatchFacts: false,
+  includeRiskReminder: false
+});
+assert.equal((topicDraft.match(/^\d+\./gm) ?? []).length, 5);
+assert.ok(topicDraft.includes("怎么做："));
+assert.ok(topicDraft.includes("说明："));
+assert.ok(topicDraft.includes("动漫二创"));
+assert.ok(topicDraft.includes("游戏二创"));
+assert.ok(!topicDraft.includes("开头15秒"));
+
+const pageSource = readFileSync(new URL("../app/hot-topics/[id]/page.tsx", import.meta.url), "utf8");
+assert.match(pageSource, /label="生成类型"/);
+assert.match(pageSource, /label="风格类型"/);
+assert.doesNotMatch(pageSource, /label="内容类型"/);
+assert.match(pageSource, /function updateConfig[\s\S]*setDraft\(""\)[\s\S]*setAudit\(null\)/);
+assert.match(pageSource, /audit\.level !== "pass" \? \(/);
+
+const routeSource = readFileSync(new URL("../app/api/ai/hot-topic-workflow/route.ts", import.meta.url), "utf8");
+assert.match(routeSource, /contentTypeInstruction\(config\)/);
+assert.match(routeSource, /styleInstruction\(config\)/);
+assert.match(routeSource, /normalizeGeneratedDraft\(result\.data\.draft, fallbackDraft, config\)/);
+assert.match(routeSource, /topicNumbers\.length !== 5/);
+assert.match(routeSource, /没有具体问题时对应数组返回空数组/);
+assert.doesNotMatch(routeSource, /信息不足时必须写“需核实”/);
 
 console.log("hot topic workflow ok");

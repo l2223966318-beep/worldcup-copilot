@@ -20,8 +20,8 @@ export type GeneratedHotPackage = {
 
 export type HotGenerationConfig = {
   platform: "B站" | "微博" | "小红书" | "抖音" | "通用";
-  contentType: "选题" | "标题" | "短文案" | "视频脚本" | "评论区互动问题" | "图文卡片结构";
-  tone: "客观资讯" | "球迷讨论" | "轻松整活" | "专业分析";
+  contentType: "选题" | "标题" | "短文案" | "视频脚本" | "评论区互动" | "图文卡片";
+  tone: "客观资讯" | "球迷讨论" | "轻松整活" | "专业复盘" | "人物故事" | "数据解读" | "稳妥表达";
   length: "短" | "中" | "长";
   useMatchFacts: boolean;
   includeRiskReminder: boolean;
@@ -206,9 +206,12 @@ function getBestFormat(topic: HotTopic) {
 
 export function generateHotDraft(topic: HotTopic, config: HotGenerationConfig) {
   const factLine = config.useMatchFacts
-    ? "可引用比赛事实，但必须只使用已确认的比分、事件和公开来源。"
-    : "不引用具体比分和球员发言，只围绕热点讨论本身展开。";
-  const riskLine = config.includeRiskReminder ? "发布前需人工核验来源，避免把讨论写成定论。" : "";
+    ? "仅使用热点标题、摘要和来源中已经明确出现的比赛事实。"
+    : "不扩写热点来源未提供的比分、事件和球员发言。";
+  const riskyTopic = hasRisk(`${topic.title} ${topic.summary ?? ""}`);
+  const riskLine = config.includeRiskReminder && riskyTopic
+    ? "该热点含伤病、判罚或争议信号，避免把讨论直接写成事实结论。"
+    : "";
   const base = {
     topicTitle: topic.title,
     sourceLine: `来源：${topic.source}${topic.url ? `｜原文：${topic.url}` : ""}`,
@@ -220,7 +223,12 @@ export function generateHotDraft(topic: HotTopic, config: HotGenerationConfig) {
   return qualityControl(body).trim();
 }
 
-export function auditHotDraft(text: string, topic: HotTopic, platform: HotGenerationConfig["platform"]): HotAuditResult {
+export function auditHotDraft(
+  text: string,
+  topic: HotTopic,
+  platform: HotGenerationConfig["platform"],
+  contentType?: HotGenerationConfig["contentType"]
+): HotAuditResult {
   const findings = {
     authenticity: [] as string[],
     risk: [] as string[],
@@ -230,35 +238,46 @@ export function auditHotDraft(text: string, topic: HotTopic, platform: HotGenera
   };
 
   if (/(实锤|官方证实|已经证明|必然|肯定|确认伤退|确认报销|确认缺席)/.test(text)) {
-    findings.authenticity.push("存在确定性表述。若来源只是热榜或公开搜索，建议改成“引发讨论”“有待核验”。");
+    const phrase = text.match(/实锤|官方证实|已经证明|必然|肯定|确认伤退|确认报销|确认缺席/)?.[0];
+    findings.authenticity.push(`“${phrase}”属于确定性表述，但当前热点材料没有提供对应证明。`);
+    findings.suggestions.push(`将“${phrase}”改成与现有来源强度一致的描述。`);
   }
-  if (/\d{1,2}[:比-]\d{1,2}/.test(text) && !/\b来源|数据|据/.test(text)) {
-    findings.authenticity.push("文案包含比分信息，建议补充数据来源或在发布前人工核验。");
+  const score = text.match(/\d{1,2}[:比-]\d{1,2}/)?.[0];
+  if (score && !/(来源[:：]|数据源|据\S{0,8}(报道|统计|显示))/.test(text)) {
+    findings.authenticity.push(`比分“${score}”在稿件中没有对应来源说明。`);
+    findings.suggestions.push(`为比分“${score}”补充明确来源，或删除该比分。`);
   }
   if (/黑哨|黑幕|假球|保送|废了|骂翻|全网都在骂|确认伤退/.test(text)) {
-    findings.risk.push("存在造谣、引战或攻击性高风险表达，不建议直接发布。");
+    const phrase = text.match(/黑哨|黑幕|假球|保送|废了|骂翻|全网都在骂|确认伤退/)?.[0];
+    findings.risk.push(`“${phrase}”带有造谣、引战或攻击性风险，不建议直接发布。`);
+    findings.suggestions.push(`删除“${phrase}”的定性，改写为对具体比赛现象的描述。`);
   }
   if (/偷|蠢|垃圾|废物|滚|地域|人种/.test(text)) {
-    findings.risk.push("存在人身攻击、地域歧视或侮辱性表达风险。");
+    const phrase = text.match(/偷|蠢|垃圾|废物|滚|地域|人种/)?.[0];
+    findings.risk.push(`“${phrase}”存在人身攻击、地域歧视或侮辱性表达风险。`);
+    findings.suggestions.push(`删除“${phrase}”，把评价落回可观察的比赛表现。`);
   }
   if (/网暴|冲了|去骂|爆破/.test(text)) {
-    findings.ethics.push("存在诱导网暴或过度煽动风险，需要删除。");
+    const phrase = text.match(/网暴|冲了|去骂|爆破/)?.[0];
+    findings.ethics.push(`“${phrase}”存在诱导网暴或过度煽动风险，需要删除。`);
+    findings.suggestions.push(`删除“${phrase}”及相关号召，不引导用户攻击具体对象。`);
   }
-  if (platform === "小红书" && text.length > 900) findings.platformFit.push("小红书图文建议更短、更分卡片，当前内容偏长。");
-  if (platform === "微博" && text.length > 500) findings.platformFit.push("微博建议前 100 字先给观点，当前文本过长。");
-  if (platform === "B站" && !/结构|开头|弹幕|评论/.test(text)) findings.platformFit.push("B站内容缺少结构、弹幕互动或评论区引导。");
-  if (!findings.authenticity.length) findings.authenticity.push("未发现明显事实冒进，但仍需核验来源链接。");
-  if (!findings.risk.length) findings.risk.push("未发现明显高风险词。");
-  if (!findings.ethics.length) findings.ethics.push("未发现明显传播伦理问题。");
-  if (!findings.platformFit.length) findings.platformFit.push(`整体适合${platform}，建议发布前再做人工校对。`);
+  if (platform === "小红书" && text.length > 900) {
+    findings.platformFit.push(`当前稿件 ${text.length} 字，小红书图文篇幅偏长。`);
+    findings.suggestions.push("压缩重复解释，并拆成每页一个信息点。");
+  }
+  if (platform === "微博" && text.length > 500) {
+    findings.platformFit.push(`当前稿件 ${text.length} 字，微博首屏信息密度不足。`);
+    findings.suggestions.push("把核心观点和热点事实前置到前 100 字。");
+  }
+  if (platform === "B站" && contentType === "视频脚本" && !/结构|开头|弹幕|评论/.test(text)) {
+    findings.platformFit.push("稿件没有视频结构、开场或互动设计，不适合作为完整 B站脚本。");
+    findings.suggestions.push("补充开场钩子、内容段落和结尾互动。");
+  }
 
-  findings.suggestions.push("把绝对判断改成“引发讨论”“可以从规则/数据角度复盘”。");
-  findings.suggestions.push("补充来源链接或注明“需人工核验”。");
-  findings.suggestions.push("避免制造球员、球队、国家之间的对立。");
-
-  const severe = findings.risk.some((item) => !item.includes("未发现") && /不建议|高风险|攻击|歧视|网暴/.test(item));
-  const needsRevision = severe || findings.authenticity.some((item) => /确定性|比分/.test(item));
-  const rewriteSuggestion = rewriteSafer(text, topic);
+  const severe = findings.risk.some((item) => /不建议|攻击|歧视|网暴/.test(item)) || findings.ethics.length > 0;
+  const needsRevision = severe || findings.authenticity.length > 0 || findings.platformFit.length > 0;
+  const rewriteSuggestion = rewriteSafer(text);
 
   return {
     level: severe ? "block" : needsRevision ? "revise" : "pass",
@@ -272,7 +291,7 @@ export function generateHotTopicPackage(topic: HotTopic, matchLabel = "今日世
     bilibili: generateHotDraft(topic, {
       platform: "B站",
       contentType: "视频脚本",
-      tone: "专业分析",
+      tone: "专业复盘",
       length: "中",
       useMatchFacts: true,
       includeRiskReminder: true
@@ -287,7 +306,7 @@ export function generateHotTopicPackage(topic: HotTopic, matchLabel = "今日世
     }).split("\n").filter(Boolean),
     xiaohongshu: generateHotDraft(topic, {
       platform: "小红书",
-      contentType: "图文卡片结构",
+      contentType: "图文卡片",
       tone: "客观资讯",
       length: "中",
       useMatchFacts: false,
@@ -321,78 +340,153 @@ function buildPlatformDraft(
   config: HotGenerationConfig,
   base: { topicTitle: string; sourceLine: string; factLine: string; riskLine: string }
 ) {
-  const risk = base.riskLine ? `\n风险提醒：${base.riskLine}` : "";
-  const verify = "目前仅能确认该热点存在讨论，具体事实需二次核验。";
+  if (config.contentType === "选题") return buildTopicAngles(topic, config);
+  if (config.contentType === "标题") return buildTitles(topic, config);
+  if (config.contentType === "短文案") return buildShortCopy(topic, config, base);
+  if (config.contentType === "视频脚本") return buildVideoScript(topic, config, base);
+  if (config.contentType === "评论区互动") return buildCommentPrompts(topic, config);
+  return buildCardStructure(topic, config, base);
+}
 
-  if (config.platform === "B站") {
-    return [
-      `B站${config.contentType}｜${base.topicTitle}`,
-      `标题1：${base.topicTitle}背后，这场世界杯热点到底该怎么看？`,
-      `标题2：别只看热搜，从规则、数据和传播情绪拆开讲。`,
-      `开头15秒：今天这个热点先别急着站队，我们先确认能确定的事实，再看它为什么会影响世界杯内容传播。`,
-      `视频结构：热点发生了什么 → 已知事实与待核验信息 → 和足球/世界杯的关系 → 可做的争议降风险表达 → 评论区问题。`,
-      `弹幕互动：你觉得这是比赛转折，还是赛后传播转折？`,
-      base.factLine,
-      base.sourceLine,
-      risk
-    ].filter(Boolean).join("\n");
-  }
+type TopicAngle = {
+  title: string;
+  approach: string;
+  reason: string;
+};
 
-  if (config.platform === "微博") {
-    return [
-      `#${base.topicTitle.replace(/\s+/g, "")}#`,
-      `先看热度，再回到事实。${base.topicTitle}正在引发讨论，但不能把讨论直接写成结论。更稳的角度是：它为什么会成为今天世界杯内容的传播入口？`,
-      `讨论钩子：你会把它做成赛事情绪复盘、规则解释，还是球迷讨论帖？`,
-      base.sourceLine,
-      risk
-    ].filter(Boolean).join("\n");
-  }
+function buildTopicAngles(topic: HotTopic, config: HotGenerationConfig) {
+  const subject = truncate(topic.title, 30);
+  const source = topic.platform ?? topic.source ?? "当前热点源";
+  const summary = normalizeSentence(topic.summary);
+  const signal = [
+    topic.heat ? `热度 ${topic.heat}` : "",
+    typeof topic.valueScore === "number" ? `价值分 ${topic.valueScore}` : "",
+    topic.category ? `${topic.category}语境` : ""
+  ].filter(Boolean).join("、");
+  const angles: TopicAngle[] = [
+    {
+      title: `${config.tone}拆解：热点是怎么形成的`,
+      approach: `围绕“${subject}”梳理触发点、传播节点和讨论分歧，只使用来源中已有的信息。`,
+      reason: summary || `${source}已提供明确讨论入口，适合先把事件脉络讲清楚。`
+    },
+    {
+      title: "把热点人物做成动漫二创",
+      approach: "用动漫角色定位表现人物关系或舆论位置，再用热点原文中的事实收束。",
+      reason: "角色化表达能降低理解门槛，适合 B站和短视频，但不能替代真实事件。"
+    },
+    {
+      title: "用足球游戏任务做游戏二创",
+      approach: "把热点拆成阵容选择、关键任务和结果复盘，用游戏语言解释讨论焦点。",
+      reason: "游戏任务结构适合表现过程和选择，不需要虚构新的比赛细节。"
+    },
+    {
+      title: "用一组数据卡判断热点价值",
+      approach: `把${signal || "平台来源、发布时间和讨论信号"}做成卡片，解释这个热点为什么值得做。`,
+      reason: "数据卡能区分真实传播信号和主观判断，适合收藏型图文或视频中段。"
+    },
+    {
+      title: "把评论分歧做成双视角作品",
+      approach: "选取两种有代表性的观点分别陈述，再回到热点原文判断哪些是事实、哪些是态度。",
+      reason: "双视角能保留讨论感，同时避免把单一观点包装成全网共识。"
+    }
+  ];
 
-  if (config.platform === "小红书") {
-    return [
-      `小红书图文｜${base.topicTitle}`,
-      `首图标题：这个世界杯热点，新手看球也能懂`,
-      `第1页：发生了什么？${verify}`,
-      "第2页：为什么会热？它有情绪点，也有比赛理解门槛。",
-      "第3页：和足球内容有什么关系？适合解释规则、比赛情绪和平台讨论。",
-      "第4页：怎么表达更安全？少用定性词，多用“引发讨论”“需核验”。",
-      "第5页：收藏理由：这套拆解方法可以复用到其他赛后热点。",
-      base.sourceLine,
-      risk
-    ].filter(Boolean).join("\n");
-  }
+  return angles.map((angle, index) => [
+    `${index + 1}. ${angle.title}`,
+    `怎么做：${angle.approach}`,
+    `说明：${angle.reason}`
+  ].join("\n")).join("\n\n");
+}
 
-  if (config.platform === "抖音") {
-    return [
-      `抖音脚本｜${base.topicTitle}`,
-      "前三秒钩子：今天这个世界杯热点，先别急着下结论。",
-      "分镜1：热搜词条/来源截图，字幕：先确认它在被讨论。",
-      "分镜2：回到比赛或足球语境，字幕：它为什么能出圈？",
-      "分镜3：给出稳妥观点，字幕：事实归事实，情绪归情绪。",
-      "口播节奏：5秒说热点，20秒讲关系，10秒提醒核验，最后抛评论区问题。",
-      base.sourceLine,
-      risk
-    ].filter(Boolean).join("\n");
-  }
+function buildTitles(topic: HotTopic, config: HotGenerationConfig) {
+  const subject = truncate(topic.title, 22);
+  const titles = [
+    subject,
+    `${subject}，讨论焦点不只一个`,
+    `从${config.tone}角度重看这个热点`,
+    "这条热榜最值得拆的三个细节",
+    `${config.platform}怎么讲清这个热点`
+  ];
+  return titles.map((title, index) => `${index + 1}. ${truncate(title, 28)}`).join("\n");
+}
 
+function buildShortCopy(
+  topic: HotTopic,
+  config: HotGenerationConfig,
+  base: { sourceLine: string; riskLine: string }
+) {
+  const summary = normalizeSentence(topic.summary);
+  const discussion = config.tone === "球迷讨论"
+    ? "你更关注事件本身，还是它在平台上的传播方式？"
+    : config.tone === "轻松整活"
+      ? "这个话题可以玩梗，但事实和观点要分开。"
+      : "先看热点原文，再判断哪些信息值得继续展开。";
   return [
-    `通用内容｜${base.topicTitle}`,
-    `核心观点：该热点可以作为体育内容入口，但具体事实需要二次核验。`,
-    `可做方向：选题、标题、短文案、视频脚本、评论区互动问题。`,
-    base.factLine,
+    `${topic.title}正在${topic.platform ?? topic.source ?? "相关平台"}形成讨论。`,
+    summary && summary !== topic.title ? summary : "",
+    discussion,
     base.sourceLine,
-    risk
+    base.riskLine ? `风险提醒：${base.riskLine}` : ""
   ].filter(Boolean).join("\n");
 }
 
-function rewriteSafer(text: string, topic: HotTopic) {
+function buildVideoScript(
+  topic: HotTopic,
+  config: HotGenerationConfig,
+  base: { sourceLine: string; factLine: string; riskLine: string }
+) {
+  const summary = normalizeSentence(topic.summary);
+  const opening = config.platform === "抖音"
+    ? `前三秒：${truncate(topic.title, 20)}，真正值得看的是什么？`
+    : `开场：热榜上的“${truncate(topic.title, 24)}”，可以拆成三层来看。`;
+  return [
+    opening,
+    `第一段：交代热点来源和已知信息。${summary || base.factLine}`,
+    `第二段：按${config.tone}风格解释讨论焦点，不补写来源中没有的细节。`,
+    "第三段：给出一个可讨论的判断，并区分事实和观点。",
+    "结尾互动：你会从事件、人物还是传播角度继续看这个热点？",
+    base.sourceLine,
+    base.riskLine ? `风险提醒：${base.riskLine}` : ""
+  ].filter(Boolean).join("\n");
+}
+
+function buildCommentPrompts(topic: HotTopic, config: HotGenerationConfig) {
+  const subject = truncate(topic.title, 24);
+  return [
+    `1. “${subject}”最值得继续追的是事件本身，还是平台讨论？`,
+    `2. 如果按${config.tone}来做，你更想看人物线、时间线还是数据线？`,
+    "3. 这个热点里，哪些是已经明确的信息，哪些只是观点？",
+    `4. 你觉得它更适合做成${config.platform}短内容，还是完整复盘？`,
+    "5. 如果只保留一个内容切口，你会选哪一个？"
+  ].join("\n");
+}
+
+function buildCardStructure(
+  topic: HotTopic,
+  config: HotGenerationConfig,
+  base: { sourceLine: string; riskLine: string }
+) {
+  const summary = normalizeSentence(topic.summary);
+  return [
+    `封面：${truncate(topic.title, 20)}`,
+    `第1页：热点发生了什么｜${summary || `来自${topic.platform ?? topic.source ?? "公开平台"}的讨论信号`}`,
+    `第2页：为什么值得看｜${topic.heat ? `当前热度 ${topic.heat}` : "已有明确平台讨论"}`,
+    `第3页：${config.tone}切口｜人物、事件和传播中选择一条主线`,
+    "第4页：作品怎么做｜给出画面、信息顺序和一个核心结论",
+    "第5页：评论区问题｜邀请用户选择下一步想看的角度",
+    base.sourceLine,
+    base.riskLine ? `风险提醒：${base.riskLine}` : ""
+  ].filter(Boolean).join("\n");
+}
+
+function rewriteSafer(text: string) {
   const cleaned = text
     .replace(/黑哨|黑幕|假球|保送/g, "争议讨论")
     .replace(/废了|垃圾|废物/g, "表现引发讨论")
     .replace(/全网都在骂|骂翻/g, "不少讨论集中在")
-    .replace(/确认伤退/g, "伤病情况需核实")
-    .replace(/实锤|官方证实/g, "有待进一步确认");
-  return `${cleaned}\n\n发布前补充：该内容基于“${topic.title}”的热点讨论整理，具体事实、比分、伤病和判罚信息需人工核验后再发布。`;
+    .replace(/确认伤退|确认报销|确认缺席/g, "伤情引发讨论")
+    .replace(/实锤|官方证实|已经证明/g, "现有讨论显示");
+  return cleaned;
 }
 
 function hasRisk(text: string) {
