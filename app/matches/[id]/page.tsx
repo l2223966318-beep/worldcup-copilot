@@ -118,6 +118,7 @@ export default function MatchAnalysisPage() {
   const [hotspotLoading, setHotspotLoading] = useState(false);
   const [hotspotError, setHotspotError] = useState("");
   const [draftForReview, setDraftForReview] = useState("");
+  const [reviewedDraft, setReviewedDraft] = useState("");
   const [selectedHotspotId, setSelectedHotspotId] = useState("");
 
   const localContent = useMemo(() => generatePlatformContent(match, selectedTopic), [match, selectedTopic]);
@@ -148,7 +149,7 @@ export default function MatchAnalysisPage() {
   const reviewSourceText = draftForReview.trim();
   const reviewResult = useMemo(() => reviewSourceText ? reviewRisk(reviewSourceText) : null, [reviewSourceText]);
   const localReviewFlow = useMemo(() => reviewSourceText && reviewResult ? buildDraftReviewFlow(reviewSourceText, match, reviewResult) : null, [match, reviewResult, reviewSourceText]);
-  const reviewFlow = aiReviewFlow ?? localReviewFlow;
+  const reviewFlow = reviewedDraft === reviewSourceText && reviewedDraft ? aiReviewFlow ?? localReviewFlow : null;
   const markdown = useMemo(() => buildMarkdown(match.name, selectedTopic, content, reviewFlow?.result.advice ?? "待审核"), [content, match.name, reviewFlow?.result.advice, selectedTopic]);
 
   useEffect(() => {
@@ -325,24 +326,26 @@ export default function MatchAnalysisPage() {
       showWorkflowNotice("请先输入稿件，或读取当前生成稿件。");
       return;
     }
+    const draftSnapshot = reviewSourceText;
     if (!activeWorkflowDraft) {
       showWorkflowNotice("请先生成平台内容，或手动输入待审稿件。");
     }
-    writeReviewDraft(reviewSourceText);
+    writeReviewDraft(draftSnapshot);
     writeWorkflowState({
       currentMatch: matchContext,
       selectedTopic: workflowTopic,
       selectedPlatform: activeWorkflowDraft?.platform ?? toWorkflowPlatform(activePlatform),
-      generatedContent: activeWorkflowDraft ? { ...activeWorkflowDraft, body: reviewSourceText } : undefined
+      generatedContent: activeWorkflowDraft ? { ...activeWorkflowDraft, body: draftSnapshot } : undefined
     });
 
+    setReviewedDraft("");
     setReviewLoading(true);
     try {
       const response = await fetch("/api/ai/review-draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          draft: reviewSourceText,
+          draft: draftSnapshot,
           matchContext,
           apiKey: getStoredDeepseekKey() || undefined
         })
@@ -356,10 +359,10 @@ export default function MatchAnalysisPage() {
       };
       if (payload.sourceStatus === "live" && payload.result) {
         setAiReviewFlow({
-          draft: reviewSourceText,
+          draft: draftSnapshot,
           result: payload.result,
           riskPoints: payload.riskPoints?.length ? payload.riskPoints : localReviewFlow?.riskPoints ?? [],
-          rewriteSuggestion: payload.rewriteSuggestion || localReviewFlow?.rewriteSuggestion || reviewSourceText,
+          rewriteSuggestion: payload.rewriteSuggestion || localReviewFlow?.rewriteSuggestion || draftSnapshot,
           checklist: payload.checklist?.length ? payload.checklist : localReviewFlow?.checklist ?? []
         });
       } else {
@@ -368,6 +371,7 @@ export default function MatchAnalysisPage() {
     } catch {
       setAiReviewFlow(null);
     } finally {
+      setReviewedDraft(draftSnapshot);
       setReviewLoading(false);
     }
   }
@@ -376,6 +380,7 @@ export default function MatchAnalysisPage() {
     setSelectedHotspotId(hotspot.id);
     setManualDraft(null);
     setDraftForReview("");
+    setReviewedDraft("");
     setAiReviewFlow(null);
     document.getElementById("platform-output")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -471,6 +476,7 @@ export default function MatchAnalysisPage() {
                 setActivePlatform(platform);
                 setManualDraft(null);
                 setDraftForReview("");
+                setReviewedDraft("");
                 setAiReviewFlow(null);
               }}
             />
@@ -489,18 +495,21 @@ export default function MatchAnalysisPage() {
             setSelectedHotspotId(hotspotId);
             setManualDraft(null);
             setDraftForReview("");
+            setReviewedDraft("");
             setAiReviewFlow(null);
           }}
           onContentTypeChange={(type) => {
             setActiveContentType(type);
             setManualDraft(null);
             setDraftForReview("");
+            setReviewedDraft("");
             setAiReviewFlow(null);
           }}
           onTopicModeChange={(mode) => {
             setActiveTopicMode(mode);
             setManualDraft(null);
             setDraftForReview("");
+            setReviewedDraft("");
             setAiReviewFlow(null);
           }}
           theme={theme}
@@ -545,6 +554,7 @@ export default function MatchAnalysisPage() {
               value={draftForReview}
               onChange={(event) => {
                 setDraftForReview(event.target.value);
+                setReviewedDraft("");
                 setAiReviewFlow(null);
               }}
               className="mt-4 min-h-64 w-full resize-y rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-7 text-slate-800 outline-none focus:border-emerald-300"
@@ -556,6 +566,7 @@ export default function MatchAnalysisPage() {
                   return;
                 }
                 setDraftForReview(getPublishableDraftText(activeWorkflowDraft));
+                setReviewedDraft("");
                 setAiReviewFlow(null);
               }} theme={theme} variant="secondary">
                 读取当前生成稿件
@@ -563,6 +574,7 @@ export default function MatchAnalysisPage() {
               <ActionButton onClick={() => {
                 if (!reviewFlow) return;
                 setDraftForReview(reviewFlow.rewriteSuggestion);
+                setReviewedDraft("");
                 setAiReviewFlow(null);
               }} theme={theme}>
                 应用改写建议
