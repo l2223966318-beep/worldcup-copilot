@@ -1,0 +1,106 @@
+模块名称：赛事证据构建与风险审稿
+来源文件：lib/services/evidenceService.ts、lib/ai/review-draft.ts
+用途：让 AI 生成和审稿都受赛事证据约束，减少编造和泛化风险提示。
+
+输入：
+- 比赛信息
+- 技术统计
+- 关键事件
+- 热点来源
+- 待审稿件
+
+输出：
+- 证据包 E01、E02、E03...
+- 句子级审稿结果
+- 风险点
+- 改写建议
+- 发布前检查项
+
+核心代码节选：
+
+export function buildEvidencePack(matchContext: MatchContext, hotspots: EvidenceHotspot[] = []) {
+  const evidence: EvidenceItem[] = [];
+  const { matchInfo, stats } = matchContext;
+
+  evidence.push({
+    id: "",
+    type: "match_stat",
+    text: `${matchInfo.teamA} vs ${matchInfo.teamB}，比分 ${matchInfo.score}`,
+    source: matchInfo.sourceStatus === "live" ? "Sportradar" : "赛事数据",
+    relevance: 100
+  });
+
+  if (matchContext.verifiedStats !== false) {
+    evidence.push({
+      id: "",
+      type: "match_stat",
+      text: `${matchInfo.teamA}控球率 ${stats.teamA.possession}%，${matchInfo.teamB}控球率 ${stats.teamB.possession}%`,
+      source: "Sportradar",
+      relevance: 94
+    });
+  }
+
+  matchContext.keyEvents.slice(0, 10).forEach((event) => {
+    evidence.push({
+      id: "",
+      type: "match_event",
+      text: `${event.minute} ${event.team} ${event.description}`,
+      source: "Sportradar",
+      relevance: event.type === "goal" ? 98 : 90
+    });
+  });
+
+  hotspots.slice(0, 8).forEach((hotspot) => {
+    evidence.push({
+      id: "",
+      type: "hot_topic",
+      text: hotspot.title,
+      source: hotspot.source,
+      sourceUrl: hotspot.url,
+      relevance: hotspot.valueScore ?? 70
+    });
+  });
+
+  return evidence
+    .sort((a, b) => b.relevance - a.relevance)
+    .slice(0, 16)
+    .map((item, index) => ({ ...item, id: `E${String(index + 1).padStart(2, "0")}` }));
+}
+
+export function auditDraftEvidence(draft: string, evidence: EvidenceItem[]) {
+  const claims = splitSentences(draft)
+    .filter(isFactualClaim)
+    .map((sentence) => {
+      const evidenceIds = findSupportingEvidence(sentence, evidence).map((item) => item.id);
+      return { sentence, supported: evidenceIds.length > 0, evidenceIds };
+    });
+
+  const unsupported = claims.filter((claim) => !claim.supported);
+
+  return {
+    claims,
+    findings: unsupported.map((claim) => ({
+      type: "缺少事实依据",
+      sentence: claim.sentence,
+      reason: "该句包含具体比分、时间点、事件或统计判断，但证据包中没有直接支持记录。",
+      rewrite: "删除该句，或补充可核验来源后再发布。",
+      evidenceStatus: "missing",
+      evidenceIds: []
+    })),
+    summary: {
+      checkedClaims: claims.length,
+      supportedClaims: claims.length - unsupported.length,
+      unsupportedClaims: unsupported.length
+    }
+  };
+}
+
+export function finalizeReviewRiskScore(rawScore: number, evidenceStatuses: Array<"missing" | "overreach" | "risk">) {
+  const score = Math.max(0, Math.min(100, Math.round(rawScore)));
+  if (!evidenceStatuses.length) return Math.min(score, 20);
+  if (evidenceStatuses.includes("risk")) return score;
+  return Math.min(score, 56);
+}
+
+在产品流程中的作用：
+审稿不再默认报高风险，而是根据句子是否有证据支持来判断，适合比赛展示和真实编辑流程。

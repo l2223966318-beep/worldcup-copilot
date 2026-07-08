@@ -1,0 +1,69 @@
+模块名称：多平台内容生成
+来源文件：lib/ai/platform-draft.ts
+用途：根据比赛证据、热点和用户选择的平台，生成可直接发布或可编辑的内容。
+
+输入：
+- 平台：B站、微博、小红书、抖音、公众号
+- 内容类型：选题、标题、短文案、视频脚本、评论区互动问题、图文卡片结构
+- 风格类型：专业分析、客观资讯、球迷讨论、轻松整活、球员故事、数据解读、风险安全版
+- 当前比赛上下文
+- 证据包
+- 选中的热点
+
+输出：
+- 可直接发布版
+- 编辑参考版
+- 风险提示版
+- 或 5 个可执行选题角度
+
+核心代码节选：
+
+export async function generatePlatformDraftWithAi(input: {
+  platform: PlatformKey;
+  contentType: ContentTypeKey;
+  topicMode: TopicModeKey;
+  matchContext: MatchContext;
+  topic: WorkflowTopic;
+  analysis: AnalysisResult;
+  apiKey?: string;
+}) {
+  const generationTask = input.contentType === "topic"
+    ? buildTopicAngleTask(input)
+    : buildPlatformDraftTask(input);
+
+  const result = await generateDeepSeekJson<AiPlatformDraft>(
+    [
+      {
+        role: "system",
+        content: [
+          "你是体育内容运营编辑，只输出严格 JSON。",
+          "只能基于输入的比赛事实、事件、数据和热点信号生成。",
+          "未出现在 evidence 中的数字，不得写入稿件。",
+          "内容要像真实运营稿，短、准、可发布。",
+          input.contentType === "topic"
+            ? "当前任务是提出作品角度，不是写完整稿件。"
+            : "如果事实不够，只能把不确定点放进风险提示。"
+        ].join("\n")
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          task: generationTask,
+          platform: input.platform,
+          contentType: input.contentType,
+          styleType: input.topicMode,
+          matchContext: input.matchContext,
+          evidence: input.matchContext.evidence ?? [],
+          topic: input.topic,
+          analysis: input.analysis
+        })
+      }
+    ],
+    { timeoutMs: 24000, apiKey: input.apiKey, quality: "quality", reasoningEffort: "high" }
+  );
+
+  return normalizePlatformDraft(result, input);
+}
+
+在产品流程中的作用：
+用户不需要一次生成所有平台内容，而是先选平台、内容类型和风格类型，再基于当前热点生成更贴近平台的产物。

@@ -1,0 +1,67 @@
+模块名称：Word 报告导出
+来源文件：lib/word-export.ts
+用途：将生成内容和审稿结果导出为可提交、可复核的 Word 文档。
+
+输入：
+- 报告文件名
+- Markdown 格式的内容报告
+
+输出：
+- .docx Word 文档
+
+核心代码节选：
+
+export async function downloadWordReport(filename: string, markdown: string) {
+  const blob = await createWordReportBlob(markdown);
+  downloadBlob(ensureDocxExtension(filename), blob);
+}
+
+export async function createWordReportBlob(markdown: string) {
+  const {
+    Document,
+    Packer,
+    Paragraph,
+    Table,
+    TextRun,
+    HeadingLevel
+  } = await import("docx");
+
+  const blocks = parseMarkdown(markdown);
+  const children: Array<InstanceType<typeof Paragraph> | InstanceType<typeof Table>> = [];
+
+  for (const block of blocks) {
+    if (block.type === "heading") {
+      children.push(new Paragraph({
+        children: createRuns(block.text),
+        heading: block.level <= 2 ? HeadingLevel.HEADING_1 : HeadingLevel.HEADING_2,
+        keepNext: true
+      }));
+      continue;
+    }
+
+    if (block.type === "table") {
+      children.push(renderTable(block.rows));
+      continue;
+    }
+
+    children.push(new Paragraph({
+      children: createRuns(block.text),
+      spacing: { after: 120, line: 280 }
+    }));
+  }
+
+  const document = new Document({
+    creator: "WorldCup Copilot",
+    title: blocks.find((block) => block.type === "heading")?.text ?? "WorldCup Copilot 内容报告",
+    sections: [{ children }]
+  });
+
+  return Packer.toBlob(document);
+}
+
+function ensureDocxExtension(filename: string) {
+  return filename.toLowerCase().endsWith(".docx") ? filename : `${filename}.docx`;
+}
+
+在产品流程中的作用：
+用户完成内容生成和审稿后，可以直接导出 Word，用于运营交付、比赛展示或归档。

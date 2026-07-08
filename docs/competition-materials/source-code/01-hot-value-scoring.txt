@@ -1,0 +1,62 @@
+模块名称：热点传播价值评分
+来源文件：lib/hot/valueScoring.ts
+用途：判断一个热点是否值得围绕当前赛事继续做内容。
+
+输入：
+- 热点标题、摘要、标签、热度、发布时间、榜单排名
+
+输出：
+- 热度分
+- 赛事相关性分
+- 时效性分
+- 内容潜力分
+- 风险扣分
+- 综合价值分
+- 价值等级和标签
+
+核心代码节选：
+
+export function scoreHotItem(item: HotItem): HotValueBreakdown {
+  const text = `${item.title} ${item.summary ?? ""} ${(item.tags ?? []).join(" ")}`;
+  const normalized = normalize(text);
+
+  const heatScore = getHeatScore(item.heat ?? item.hot, item.rank);
+  const relevanceScore = getRelevanceScore(normalized);
+  const timelinessScore = getTimelinessScore(item.publishedAt ?? item.time);
+  const contentPotentialScore = getContentPotentialScore(normalized);
+  const riskPenalty = getRiskPenalty(normalized);
+
+  const weakSports = relevanceScore < 12;
+  const cappedHeatScore = weakSports ? Math.min(heatScore, 12) : heatScore;
+
+  const valueScore = clamp(
+    cappedHeatScore + relevanceScore + timelinessScore + contentPotentialScore - riskPenalty,
+    0,
+    100
+  );
+
+  return {
+    heatScore: cappedHeatScore,
+    relevanceScore,
+    timelinessScore,
+    contentPotentialScore,
+    riskPenalty,
+    valueScore,
+    valueLevel: getValueLevel(valueScore),
+    category: classifyCategory(normalized),
+    tags: buildTags(normalized, getValueLevel(valueScore))
+  };
+}
+
+function getValueLevel(score: number): HotValueLevel {
+  if (score >= 75) return "high";
+  if (score >= 50) return "medium";
+  return "low";
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+在产品流程中的作用：
+热点进入系统后先被评分，再决定是否进入“今日热点雷达”和“场上热点信号”的优先展示区域。

@@ -1,0 +1,70 @@
+模块名称：场上热点信号聚合
+来源文件：lib/services/matchDetailPresentation.ts
+用途：汇集场上事件和外部热点源，生成与当前比赛相关的热点短榜。
+
+输入：
+- 当前比赛信息
+- 场上事件信号
+- 微博、B站、小红书、百度、头条等热点源结果
+
+输出：
+- 去重后的比赛相关热点
+- 热度分
+- 价值分
+- 来源平台
+- 可进入分析或生成内容的热点卡片
+
+核心代码节选：
+
+export function buildMatchHotspotShortlist({
+  match,
+  signals,
+  hotItems,
+  limit = 8
+}: {
+  match: MatchData;
+  signals: MatchSignal[];
+  hotItems: HotItem[];
+  limit?: number;
+}): MatchHotspot[] {
+  const sourceTopics = hotItems
+    .map((item) => hotItemToMatchHotspot(item, match))
+    .filter((item): item is MatchHotspot => Boolean(item));
+
+  const signalTopics = signals.map((signal) => signalToMatchHotspot(signal, match));
+  const deduped = dedupeHotspots([...sourceTopics, ...signalTopics]);
+
+  const sorted = deduped.sort(
+    (a, b) => b.heatScore - a.heatScore || b.valueScore - a.valueScore || a.rank - b.rank
+  );
+
+  return selectDiverseHotspots(sorted, limit)
+    .map((item, index) => ({ ...item, rank: index + 1 }));
+}
+
+export function mergeHotSearchPayloads(payloads: HotSearchPayload[]): HotSearchPayload {
+  const liveRank = { live: 5, partial: 4, cache: 3, fallback: 2, error: 1 };
+  const sortedPayloads = [...payloads].sort(
+    (a, b) => liveRank[b.sourceStatus] - liveRank[a.sourceStatus]
+  );
+
+  const seen = new Set<string>();
+  const data = payloads
+    .flatMap((payload) => payload.data)
+    .filter((item) => {
+      const key = normalizeText(item.url || item.title);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+  return {
+    sourceStatus: sortedPayloads[0]?.sourceStatus ?? "fallback",
+    data,
+    lastUpdated: payloads[0]?.lastUpdated ?? new Date().toISOString(),
+    message: payloads.map((payload) => payload.message).filter(Boolean).join("；")
+  };
+}
+
+在产品流程中的作用：
+比赛详情页的热点不是随机展示，而是从所有可用信息源中筛出和当前比赛真正相关的内容，再供 AI 做选题和内容生成。
