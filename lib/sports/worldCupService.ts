@@ -144,7 +144,10 @@ async function cachedFirstAvailable<T>(
     try {
       const payload = await source.load();
       if (payload.sourceStatus === "live" || payload.sourceStatus === "fallback") {
-        const resolvedPayload = lastMessage ? withFallbackMessage(payload, lastMessage) : payload;
+        // A usable fallback should render as data, not as an upstream provider error.
+        const resolvedPayload = lastMessage && payload.sourceStatus === "fallback"
+          ? withFallbackMessage(payload, lastMessage)
+          : payload;
         cache.set(key, { expiresAt: now + ttlMs, payload: resolvedPayload });
         return resolvedPayload;
       }

@@ -21,17 +21,11 @@ export default function DashboardPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("");
   const [competitionFilter, setCompetitionFilter] = useState("all");
-  const useFullFixturePool = Boolean(matchSearchQuery.trim() || dateFilter || statusFilter !== "all" || competitionFilter !== "all");
-  const { payload, loading, error } = useWorldCupQuery<WorldCupMatch[]>("/api/worldcup/fixtures/today", 20_000, {
-    cacheKey: "worldcup.fixtures.today",
-    staleMs: 90_000
-  });
-  const { payload: allPayload, loading: allLoading } = useWorldCupQuery<WorldCupMatch[]>("/api/worldcup/fixtures", 120_000, {
-    enabled: useFullFixturePool,
-    cacheKey: "worldcup.fixtures.all",
+  const { payload, loading, error } = useWorldCupQuery<WorldCupMatch[]>("/api/worldcup/fixtures", 120_000, {
+    cacheKey: "worldcup.fixtures.season",
     staleMs: 300_000
   });
-  const matches = useFullFixturePool ? allPayload?.data ?? [] : payload?.data ?? [];
+  const matches = payload?.data ?? [];
   const queryFilteredMatches = filterMatchesByQuery(matches, matchSearchQuery);
   const filteredMatches = queryFilteredMatches
     .filter((item) => {
@@ -46,12 +40,13 @@ export default function DashboardPage() {
       return left - right;
     });
   const competitions = Array.from(new Set(matches.map((item) => item.competition))).filter(Boolean);
-  const activePayload = useFullFixturePool ? allPayload : payload;
+  const activePayload = payload;
   const activeStatus = activePayload?.sourceStatus ?? "fallback";
   const sourceIssue = formatSourceIssue(activePayload?.message);
   const hasFilters = Boolean(matchSearchQuery.trim() || dateFilter || statusFilter !== "all" || competitionFilter !== "all");
+  const visibleMatches = hasFilters ? filteredMatches : filteredMatches.slice(-12).reverse();
   const isMockMode = activeStatus === "fallback";
-  const isNoDataState = !loading && !error && !hasFilters && filteredMatches.length === 0;
+  const isNoDataState = !loading && !error && !hasFilters && visibleMatches.length === 0;
   useEffect(() => {
     setSportType(readSavedSportType());
   }, []);
@@ -101,7 +96,7 @@ export default function DashboardPage() {
                 status={activeStatus}
                 provider={readPayloadProvider(activePayload?.data)}
                 lastUpdated={activePayload?.lastUpdated}
-                loading={loading || (useFullFixturePool && allLoading)}
+                loading={loading}
                 error={error || sourceIssue}
               />
             </div>
@@ -150,8 +145,8 @@ export default function DashboardPage() {
               </label>
             </div>
             <div className="mt-6 grid gap-5">
-              {filteredMatches.length ? (
-                filteredMatches.map((item) => (
+              {visibleMatches.length ? (
+                visibleMatches.map((item) => (
                   <OpportunityMatchCard key={item.id} match={item} theme={theme} sourceStatus={activeStatus} />
                 ))
               ) : isNoDataState ? (
