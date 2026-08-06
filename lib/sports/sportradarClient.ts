@@ -6,7 +6,7 @@ const WORLD_CUP_LEAGUE = 1;
 const WORLD_CUP_SEASON = 2026;
 const DEFAULT_ACCESS_LEVEL = "trial";
 const DEFAULT_LANGUAGE_CODE = "en";
-const REQUEST_TIMEOUT_MS = Number(process.env.SPORTRADAR_TIMEOUT_MS ?? 5000);
+const REQUEST_TIMEOUT_MS = Number(process.env.SPORTRADAR_TIMEOUT_MS ?? 12_000);
 const SEASON_SUMMARIES_PAGE_SIZE = 100;
 
 type SportradarNamed = {
@@ -205,11 +205,11 @@ async function getSeasonSummaries(config: SportradarConfig) {
     `seasons/${encodeURIComponent(config.seasonId)}/summaries.json`,
     false,
     { limit: String(SEASON_SUMMARIES_PAGE_SIZE), start: String(SEASON_SUMMARIES_PAGE_SIZE) }
-  );
+  ).catch(() => undefined);
 
   return {
-    generated_at: firstPage.generated_at ?? nextPage.generated_at,
-    summaries: [...firstSummaries, ...(nextPage.summaries ?? [])]
+    generated_at: firstPage.generated_at ?? nextPage?.generated_at,
+    summaries: [...firstSummaries, ...(nextPage?.summaries ?? [])]
   };
 }
 
