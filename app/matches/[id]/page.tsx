@@ -126,6 +126,7 @@ export default function MatchAnalysisPage() {
   const [draftForReview, setDraftForReview] = useState("");
   const [reviewedDraft, setReviewedDraft] = useState("");
   const [selectedHotspotId, setSelectedHotspotId] = useState("");
+  const [activeHotspotKind, setActiveHotspotKind] = useState<"onField" | "offField">("onField");
 
   const localContent = useMemo(() => generatePlatformContent(match, selectedTopic), [match, selectedTopic]);
   const content = useMemo(() => {
@@ -146,6 +147,9 @@ export default function MatchAnalysisPage() {
     () => buildMatchHotspotShortlist({ match, signals: matchSignals, hotItems: matchHotItems }),
     [match, matchHotItems, matchSignals]
   );
+  const onFieldHotspots = useMemo(() => matchHotspots.filter((hotspot) => hotspot.kind === "onField"), [matchHotspots]);
+  const offFieldHotspots = useMemo(() => matchHotspots.filter((hotspot) => hotspot.kind === "offField"), [matchHotspots]);
+  const visibleHotspots = activeHotspotKind === "onField" ? onFieldHotspots : offFieldHotspots;
   const evidence = useMemo(() => buildEvidencePack(matchContext, matchHotspots), [matchContext, matchHotspots]);
   const evidenceContext = useMemo(() => ({ ...matchContext, evidence }), [evidence, matchContext]);
   const selectedHotspot = matchHotspots.find((hotspot) => hotspot.id === selectedHotspotId) ?? matchHotspots[0] ?? null;
@@ -440,9 +444,25 @@ export default function MatchAnalysisPage() {
       </section>
 
       <section className="rounded-[32px] border bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.06)]" style={{ borderColor: theme.border }}>
-        <SectionTitle eyebrow="FIELD SIGNALS" title="场上热点信号" description="把外部热榜和本场事件合并成短榜，按热度与比赛相关性排序，像热搜一样先看最值得处理的内容。" />
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          {matchHotspots.map((hotspot) => (
+        <SectionTitle eyebrow="MATCH SIGNALS" title="赛事热点信号" description="场上事件和外部热议分开查看，只保留能关联本场球队或球员的真实来源。" />
+        <div className="mt-5 inline-flex rounded-full bg-slate-100 p-1">
+          <button
+            type="button"
+            onClick={() => setActiveHotspotKind("onField")}
+            className={`h-9 rounded-full px-4 text-sm font-semibold transition ${activeHotspotKind === "onField" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"}`}
+          >
+            场上事件 {onFieldHotspots.length}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveHotspotKind("offField")}
+            className={`h-9 rounded-full px-4 text-sm font-semibold transition ${activeHotspotKind === "offField" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"}`}
+          >
+            场外热议 {offFieldHotspots.length}
+          </button>
+        </div>
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          {visibleHotspots.map((hotspot) => (
             <MatchHotspotCard
               key={hotspot.id}
               hotspot={hotspot}
@@ -452,6 +472,11 @@ export default function MatchAnalysisPage() {
               onUse={() => openHotspotWorkflow(hotspot)}
             />
           ))}
+          {!visibleHotspots.length ? (
+            <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-sm leading-6 text-slate-500 lg:col-span-2">
+              当前未命中本场球队或关键球员的场外热议。
+            </div>
+          ) : null}
         </div>
       </section>
 

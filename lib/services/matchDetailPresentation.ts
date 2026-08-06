@@ -12,6 +12,7 @@ export type TeamRadarRow = {
 export type MatchHotspot = {
   id: string;
   rank: number;
+  kind: "onField" | "offField";
   title: string;
   summary: string;
   source: string;
@@ -199,6 +200,7 @@ function normalizePair(valueA: number, valueB: number, inverse = false) {
 }
 
 function hotItemToMatchHotspot(item: HotItem, match: MatchData): MatchHotspot | null {
+  if (isDemoHotItem(item)) return null;
   const text = `${item.title} ${item.summary} ${(item.tags ?? []).join(" ")}`;
   const reason = getMatchReason(text, match);
   if (!reason) return null;
@@ -209,6 +211,7 @@ function hotItemToMatchHotspot(item: HotItem, match: MatchData): MatchHotspot | 
   return {
     id: item.id,
     rank: item.rank ?? 999,
+    kind: "offField",
     title: item.title,
     summary: item.summary || "热点源没有返回摘要，进入分析页后需先补充事实核验。",
     source: item.source,
@@ -226,6 +229,7 @@ function signalToMatchHotspot(signal: Pick<MatchSignal, "id" | "label" | "minute
   return {
     id: signal.id,
     rank: 999,
+    kind: "onField",
     title: signal.topicSeed,
     summary: `${signal.minute}｜${signal.team}｜${signal.evidence}`,
     source: "场上事件",
@@ -244,8 +248,11 @@ function getMatchReason(text: string, match: MatchData) {
   const teamBAliases = teamAliases(match.teamB);
   const hasTeamA = teamAAliases.some((alias) => normalized.includes(alias));
   const hasTeamB = teamBAliases.some((alias) => normalized.includes(alias));
-  if (hasTeamA && hasTeamB) return "当前对阵";
-  if (matchEntityAliases(match).some((alias) => normalized.includes(alias))) return "本场球员或事件";
+  if (hasTeamA && hasTeamB) return "当前对阵场外讨论";
+  if (matchEntityAliases(match).some((alias) => normalized.includes(alias))) return "本场球员场外热议";
+  if ((hasTeamA || hasTeamB) && OFF_FIELD_TERMS.some((term) => normalized.includes(term))) {
+    return "参赛球队场外动态";
+  }
   if ((hasTeamA || hasTeamB) && MATCH_EVENT_TERMS.some((term) => normalized.includes(term))) {
     return "本场球员或事件";
   }
@@ -274,7 +281,14 @@ function selectDiverseHotspots(items: MatchHotspot[], limit: number) {
   const selectedIds = new Set<string>();
   const selectedSources = new Set<string>();
 
-  for (const item of items) {
+  const preferredItems = [
+    ...items.filter((item) => item.kind === "offField").slice(0, 1),
+    ...items
+  ];
+
+  // Keep one confirmed off-field discussion when sources return it, otherwise
+  // the higher-volume match-event feed would always occupy every slot.
+  for (const item of preferredItems) {
     const sourceKey = item.source === "场上事件" ? item.source : item.platform || item.source;
     if (selectedSources.has(sourceKey)) continue;
     selected.push(item);
@@ -291,6 +305,11 @@ function selectDiverseHotspots(items: MatchHotspot[], limit: number) {
   }
 
   return selected;
+}
+
+function isDemoHotItem(item: HotItem) {
+  const text = `${item.source} ${item.platform} ${(item.tags ?? []).join(" ")}`;
+  return /AI策略|系统提示|演示数据|示例逻辑/i.test(text);
 }
 
 const MATCH_EVENT_TERMS = [
@@ -311,6 +330,29 @@ const MATCH_EVENT_TERMS = [
   "substitution",
   "save",
   "shot"
+].map(normalizeText);
+
+const OFF_FIELD_TERMS = [
+  "发布会",
+  "采访",
+  "训练",
+  "名单",
+  "伤情",
+  "球迷",
+  "抵达",
+  "行程",
+  "更衣室",
+  "媒体",
+  "社媒",
+  "争议",
+  "转会",
+  "press conference",
+  "interview",
+  "training",
+  "squad",
+  "fans",
+  "media",
+  "social media"
 ].map(normalizeText);
 
 const IGNORED_EVENT_WORDS = new Set(
