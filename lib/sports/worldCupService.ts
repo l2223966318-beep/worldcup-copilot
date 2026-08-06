@@ -27,7 +27,8 @@ import {
 } from "@/lib/sports/worldCup2026FreeClient";
 import { getBeijingDateKey } from "@/lib/time/beijingTime";
 
-const FIXTURE_CACHE_TTL_MS = 10 * 60_000;
+// Retry a recovered primary source promptly instead of holding a fallback fixture list for ten minutes.
+const FIXTURE_CACHE_TTL_MS = 2 * 60_000;
 const ACTIVE_CACHE_TTL_MS = 10 * 60_000;
 const LIVE_CACHE_TTL_MS = 2 * 60_000;
 const ERROR_CACHE_TTL_MS = 2 * 60_000;
