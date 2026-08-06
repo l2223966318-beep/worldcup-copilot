@@ -13,6 +13,7 @@ export type MatchHotspot = {
   id: string;
   rank: number;
   kind: "onField" | "offField";
+  relation: "direct" | "community";
   title: string;
   summary: string;
   source: string;
@@ -61,9 +62,14 @@ export function buildMatchHotspotShortlist({
   hotItems: HotItem[];
   limit?: number;
 }): MatchHotspot[] {
-  const sourceTopics = hotItems
+  const directSourceTopics = hotItems
     .map((item) => hotItemToMatchHotspot(item, match))
     .filter((item): item is MatchHotspot => Boolean(item));
+  const sourceTopics = directSourceTopics.length
+    ? directSourceTopics
+    : hotItems
+      .map(hotItemToCommunityHotspot)
+      .filter((item): item is MatchHotspot => Boolean(item));
   const signalTopics = signals.map((signal) => signalToMatchHotspot(signal, match));
   const deduped = dedupeHotspots([...sourceTopics, ...signalTopics]);
   const sorted = deduped.sort(
@@ -212,6 +218,7 @@ function hotItemToMatchHotspot(item: HotItem, match: MatchData): MatchHotspot | 
     id: item.id,
     rank: item.rank ?? 999,
     kind: "offField",
+    relation: "direct",
     title: item.title,
     summary: item.summary || "热点源没有返回摘要，进入分析页后需先补充事实核验。",
     source: item.source,
@@ -225,11 +232,35 @@ function hotItemToMatchHotspot(item: HotItem, match: MatchData): MatchHotspot | 
   };
 }
 
+function hotItemToCommunityHotspot(item: HotItem): MatchHotspot | null {
+  if (isDemoHotItem(item) || !isFootballDiscussion(item)) return null;
+
+  const rawHeat = numericHeat(item.heat ?? item.hot);
+  const heatBonus = rawHeat > 0 ? Math.round(Math.log10(rawHeat + 1) * 100) : 0;
+  return {
+    id: `community-${item.id}`,
+    rank: item.rank ?? 999,
+    kind: "offField",
+    relation: "community",
+    title: item.title,
+    summary: item.summary || "来自足球社区的实时讨论，适合作为延展选题，不应写成本场已发生事实。",
+    source: item.source,
+    platform: item.platform,
+    heat: item.heat ?? item.hot,
+    heatScore: (item.valueScore ?? item.relevance ?? 0) * 100 + heatBonus,
+    valueScore: item.valueScore ?? item.relevance ?? 0,
+    matchReason: "足球社区实时热议，未直接指向本场",
+    actionText: "进入分析/生成",
+    url: item.url
+  };
+}
+
 function signalToMatchHotspot(signal: Pick<MatchSignal, "id" | "label" | "minute" | "team" | "evidence" | "topicSeed" | "contentValue" | "recommendedPlatforms">, match: MatchData): MatchHotspot {
   return {
     id: signal.id,
     rank: 999,
     kind: "onField",
+    relation: "direct",
     title: signal.topicSeed,
     summary: `${signal.minute}｜${signal.team}｜${signal.evidence}`,
     source: "场上事件",
@@ -310,6 +341,11 @@ function selectDiverseHotspots(items: MatchHotspot[], limit: number) {
 function isDemoHotItem(item: HotItem) {
   const text = `${item.source} ${item.platform} ${(item.tags ?? []).join(" ")}`;
   return /AI策略|系统提示|演示数据|示例逻辑/i.test(text);
+}
+
+function isFootballDiscussion(item: HotItem) {
+  const text = `${item.title} ${item.summary} ${(item.tags ?? []).join(" ")}`;
+  return /足球|男足|女足|国足|fifa|world\s*cup/i.test(text);
 }
 
 const MATCH_EVENT_TERMS = [
