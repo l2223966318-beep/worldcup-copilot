@@ -105,15 +105,15 @@ export async function GET(request: Request) {
     const settled = await Promise.allSettled(tasks);
     const failures = settled.filter((result) => result.status === "rejected");
     const messages = settled.flatMap((result) => (result.status === "fulfilled" && result.value.message ? [result.value.message] : []));
-    const items = settled
+    const rankedItems = settled
       .flatMap((result) => (result.status === "fulfilled" ? result.value.items : []))
       .filter((item) => item.title)
       .filter((item) => source === "all" || matchSource(item, source))
       .map(enrichValueScore)
       .filter((item) => scope === "all" || isSportsRelated(item))
       .filter(dedupeByTitle)
-      .sort(sortByValue)
-      .slice(0, limit);
+      .sort(sortByValue);
+    const items = source === "all" ? balancePlatformCoverage(rankedItems, limit) : rankedItems.slice(0, limit);
 
     if (!items.length && failures.length) {
       return NextResponse.json(createPayload("error", [], MESSAGE.failed), { status: 502 });
@@ -396,6 +396,32 @@ function sortByValue(a: HotItem, b: HotItem) {
   const heatDiff = numericHeat(b.heat ?? b.hot) - numericHeat(a.heat ?? a.hot);
   if (heatDiff !== 0) return heatDiff;
   return (a.rank ?? 999) - (b.rank ?? 999);
+}
+
+// The all-platform view should represent the available sources instead of being
+// dominated by whichever source happens to have the highest raw heat values.
+function balancePlatformCoverage(items: HotItem[], limit: number) {
+  const perPlatformLimit = limit >= 12 ? 2 : 1;
+  const selected: HotItem[] = [];
+  const selectedIds = new Set<string>();
+  const counts = new Map<string, number>();
+
+  for (const item of items) {
+    const platform = item.platform || item.source || "unknown";
+    if ((counts.get(platform) ?? 0) >= perPlatformLimit) continue;
+    selected.push(item);
+    selectedIds.add(item.id);
+    counts.set(platform, (counts.get(platform) ?? 0) + 1);
+  }
+
+  for (const item of items) {
+    if (selected.length >= limit) break;
+    if (selectedIds.has(item.id)) continue;
+    selected.push(item);
+    selectedIds.add(item.id);
+  }
+
+  return selected.slice(0, limit).sort(sortByValue);
 }
 
 function numericHeat(value: unknown) {
