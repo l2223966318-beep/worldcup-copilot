@@ -46,7 +46,7 @@ globalThis.fetch = async (input) => {
   requests.push(String(input));
   return new Response(JSON.stringify({
     generated_at: "2026-06-29T00:00:00Z",
-    schedules: [
+    summaries: [
       {
         sport_event: {
           id: "sr:sport_event:1",
@@ -76,9 +76,9 @@ const { getSportradarWorldCupToday } = await import(
 const payload = await getSportradarWorldCupToday("2026-06-29");
 
 assert.equal(requests.length, 1, "today loader should avoid bursting three Sportradar requests");
-assert.match(requests[0], /seasons\/sr%3Aseason%3A101177\/schedules\.json/);
+assert.match(requests[0], /seasons\/sr%3Aseason%3A101177\/summaries\.json/);
 assert.equal(payload.sourceStatus, "live");
 assert.equal(payload.data.length, 1);
 assert.equal(payload.data[0].source.provider, "sportradar");
 
-console.log("sportradar today schedule ok");
+console.log("sportradar today summaries ok");

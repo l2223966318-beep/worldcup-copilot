@@ -103,6 +103,11 @@ type SportradarScheduleResponse = {
   schedules?: SportradarSchedule[];
 };
 
+type SportradarSeasonSummariesResponse = {
+  generated_at?: string;
+  summaries?: SportradarSchedule[];
+};
+
 type SportradarSummaryResponse = {
   generated_at?: string;
   sport_event?: SportradarSportEvent;
@@ -144,13 +149,8 @@ export async function getSportradarWorldCupFixtures(): Promise<WorldCupPayload<W
     throw new Error("SPORTRADAR_WORLD_CUP_SEASON_ID is required for the full Sportradar schedule.");
   }
 
-  const payload = await fetchSportradarJson<SportradarScheduleResponse>(
-    config,
-    `seasons/${encodeURIComponent(config.seasonId)}/schedules.json`,
-    false,
-    { limit: "1000" }
-  );
-  const matches = normalizeSchedules(payload.schedules ?? [], payload.generated_at);
+  const payload = await getSeasonSummaries(config);
+  const matches = normalizeSchedules(payload.summaries ?? [], payload.generated_at);
   if (!matches.length) throw new Error("Sportradar returned no fixtures for the configured season.");
   return createPayload("live", matches);
 }
@@ -158,13 +158,8 @@ export async function getSportradarWorldCupFixtures(): Promise<WorldCupPayload<W
 export async function getSportradarWorldCupToday(date: string): Promise<WorldCupPayload<WorldCupMatch[]>> {
   const config = getSportradarConfig();
   if (config.seasonId) {
-    const payload = await fetchSportradarJson<SportradarScheduleResponse>(
-      config,
-      `seasons/${encodeURIComponent(config.seasonId)}/schedules.json`,
-      false,
-      { limit: "1000" }
-    );
-    const matches = dedupeMatches(normalizeSchedules(payload.schedules ?? [], payload.generated_at)).filter(
+    const payload = await getSeasonSummaries(config);
+    const matches = dedupeMatches(normalizeSchedules(payload.summaries ?? [], payload.generated_at)).filter(
       (match) => getBeijingDateKeyFromValue(match.kickoffTime) === date
     );
     return createPayload("live", matches, matches.length ? undefined : "No Sportradar matches for this Beijing date.");
@@ -187,6 +182,19 @@ export async function getSportradarWorldCupToday(date: string): Promise<WorldCup
     (match) => getBeijingDateKeyFromValue(match.kickoffTime) === date
   );
   return createPayload("live", matches, matches.length ? undefined : "No Sportradar matches for this Beijing date.");
+}
+
+function getSeasonSummaries(config: SportradarConfig) {
+  if (!config.seasonId) {
+    throw new Error("SPORTRADAR_WORLD_CUP_SEASON_ID is required for season summaries.");
+  }
+
+  return fetchSportradarJson<SportradarSeasonSummariesResponse>(
+    config,
+    `seasons/${encodeURIComponent(config.seasonId)}/summaries.json`,
+    false,
+    { limit: "1000" }
+  );
 }
 
 export async function getSportradarWorldCupLive(): Promise<WorldCupPayload<WorldCupMatch[]>> {
