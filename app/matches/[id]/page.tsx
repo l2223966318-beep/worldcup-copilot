@@ -444,7 +444,7 @@ export default function MatchAnalysisPage() {
       </section>
 
       <section className="rounded-[32px] border bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.06)]" style={{ borderColor: theme.border }}>
-        <SectionTitle eyebrow="MATCH SIGNALS" title="赛事热点信号" description="场上事件与外部讨论分开查看；没有本场关联时，保留真实足球社区热议作为延展选题。" />
+        <SectionTitle eyebrow="MATCH SIGNALS" title="赛事热点信号" description="场上事件与场外热议分开查看；场外内容仅保留能关联本场球队、球员或赛事的真实来源。" />
         <div className="mt-5 inline-flex rounded-full bg-slate-100 p-1">
           <button
             type="button"
@@ -994,7 +994,6 @@ function MatchHotspotCard({
           <div className="flex flex-wrap gap-2">
             <HotspotBadge>{compactHotspotLabel(hotspot.platform || "全网")}</HotspotBadge>
             <HotspotBadge>{compactHotspotLabel(hotspot.source)}</HotspotBadge>
-            {hotspot.kind === "offField" ? <HotspotBadge>{hotspot.relation === "community" ? "足球社区" : "本场关联"}</HotspotBadge> : null}
             <span className="inline-flex max-w-24 items-center rounded-full px-2.5 py-1 text-[11px] font-semibold text-white" style={{ backgroundColor: theme.primary }}>
               热度 {hotspot.heat ?? hotspot.valueScore}
             </span>
