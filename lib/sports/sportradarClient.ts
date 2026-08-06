@@ -7,6 +7,7 @@ const WORLD_CUP_SEASON = 2026;
 const DEFAULT_ACCESS_LEVEL = "trial";
 const DEFAULT_LANGUAGE_CODE = "en";
 const REQUEST_TIMEOUT_MS = Number(process.env.SPORTRADAR_TIMEOUT_MS ?? 5000);
+const SEASON_SUMMARIES_PAGE_SIZE = 100;
 
 type SportradarNamed = {
   id?: string;
@@ -184,17 +185,32 @@ export async function getSportradarWorldCupToday(date: string): Promise<WorldCup
   return createPayload("live", matches, matches.length ? undefined : "No Sportradar matches for this Beijing date.");
 }
 
-function getSeasonSummaries(config: SportradarConfig) {
+async function getSeasonSummaries(config: SportradarConfig) {
   if (!config.seasonId) {
     throw new Error("SPORTRADAR_WORLD_CUP_SEASON_ID is required for season summaries.");
   }
 
-  return fetchSportradarJson<SportradarSeasonSummariesResponse>(
+  const firstPage = await fetchSportradarJson<SportradarSeasonSummariesResponse>(
     config,
     `seasons/${encodeURIComponent(config.seasonId)}/summaries.json`,
     false,
-    { limit: "1000" }
+    { limit: String(SEASON_SUMMARIES_PAGE_SIZE) }
   );
+
+  const firstSummaries = firstPage.summaries ?? [];
+  if (firstSummaries.length < SEASON_SUMMARIES_PAGE_SIZE) return firstPage;
+
+  const nextPage = await fetchSportradarJson<SportradarSeasonSummariesResponse>(
+    config,
+    `seasons/${encodeURIComponent(config.seasonId)}/summaries.json`,
+    false,
+    { limit: String(SEASON_SUMMARIES_PAGE_SIZE), start: String(SEASON_SUMMARIES_PAGE_SIZE) }
+  );
+
+  return {
+    generated_at: firstPage.generated_at ?? nextPage.generated_at,
+    summaries: [...firstSummaries, ...(nextPage.summaries ?? [])]
+  };
 }
 
 export async function getSportradarWorldCupLive(): Promise<WorldCupPayload<WorldCupMatch[]>> {
