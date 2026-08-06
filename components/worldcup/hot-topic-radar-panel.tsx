@@ -57,7 +57,7 @@ export function HotTopicRadarPanel({
     setError("");
 
     try {
-      const response = await fetch(`/api/hot?source=all&scope=all&limit=20&xhsQuery=${encodeURIComponent("世界杯 足球")}`, {
+      const response = await fetch(`/api/hot?source=all&scope=all&limit=20&refresh=1&xhsQuery=${encodeURIComponent("世界杯 足球")}`, {
         cache: "no-store",
         headers: getStoredHotSourceHeaders()
       });

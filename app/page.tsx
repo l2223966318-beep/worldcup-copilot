@@ -23,9 +23,10 @@ export default function DashboardPage() {
   const [competitionFilter, setCompetitionFilter] = useState("all");
   const { payload, loading, error } = useWorldCupQuery<WorldCupMatch[]>("/api/worldcup/fixtures", 120_000, {
     cacheKey: "worldcup.fixtures.season",
-    staleMs: 300_000
+    staleMs: 0,
+    forceRefreshOnMount: true
   });
-  const matches = (payload?.data ?? []).filter(isResolvedFixture);
+  const matches = (payload?.data ?? []).filter(isDisplayableFixture);
   const queryFilteredMatches = filterMatchesByQuery(matches, matchSearchQuery);
   const filteredMatches = queryFilteredMatches
     .filter((item) => {
@@ -764,9 +765,9 @@ function formatKickoffTime(value: string) {
   });
 }
 
-function isResolvedFixture(match: WorldCupMatch) {
+function isDisplayableFixture(match: WorldCupMatch) {
   const teams = `${match.homeTeam.name} ${match.awayTeam.name}`;
-  return !/(winner|loser)\s+match/i.test(teams) && match.score.home !== null && match.score.away !== null;
+  return !/(winner|loser)\s+match|group\s+[a-l]\s+(winners?|runners-up)|third place/i.test(teams);
 }
 
 function readSavedSportType(): SportType {

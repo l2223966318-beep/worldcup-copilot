@@ -57,6 +57,7 @@ export async function GET(request: Request) {
   const source = searchParams.get("source") || "all";
   const scope = searchParams.get("scope") || "sports";
   const xhsQuery = searchParams.get("xhsQuery")?.trim() || "";
+  const forceRefresh = searchParams.get("refresh") === "1";
   const limit = clampLimit(searchParams.get("limit"));
   const requestLimit = scope === "all" ? limit : Math.min(100, Math.max(limit * 5, 50));
   const useMock = process.env.NEXT_PUBLIC_USE_MOCK === "true";
@@ -70,7 +71,7 @@ export async function GET(request: Request) {
   const cacheKey = `hot:${source}:${scope}:${limit}:${xhsQuery}:${baseUrl ?? ""}:${endpoint ?? ""}:${clientXhs.cacheKey}:${dailyHotBaseUrl}`;
 
   const cached = hotCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
+  if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
     return NextResponse.json({ ...cached.payload, sourceStatus: "cache" });
   }
 
