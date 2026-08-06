@@ -25,7 +25,7 @@ export default function DashboardPage() {
     cacheKey: "worldcup.fixtures.season",
     staleMs: 300_000
   });
-  const matches = payload?.data ?? [];
+  const matches = (payload?.data ?? []).filter(isResolvedFixture);
   const queryFilteredMatches = filterMatchesByQuery(matches, matchSearchQuery);
   const filteredMatches = queryFilteredMatches
     .filter((item) => {
@@ -762,6 +762,11 @@ function formatKickoffTime(value: string) {
     hour: "2-digit",
     minute: "2-digit"
   });
+}
+
+function isResolvedFixture(match: WorldCupMatch) {
+  const teams = `${match.homeTeam.name} ${match.awayTeam.name}`;
+  return !/(winner|loser)\s+match/i.test(teams) && match.score.home !== null && match.score.away !== null;
 }
 
 function readSavedSportType(): SportType {

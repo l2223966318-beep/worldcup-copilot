@@ -133,9 +133,11 @@ async function cachedFirstAvailable<T>(
   const entry = cache.get(key) as CacheEntry<T> | undefined;
   const now = Date.now();
 
-  if (entry && entry.expiresAt > now) {
+  if (entry && entry.expiresAt > now && !isFallbackFixturePayload(entry.payload)) {
     return { ...entry.payload, sourceStatus: "cache" as SourceStatus };
   }
+
+  if (entry && isFallbackFixturePayload(entry.payload)) cache.delete(key);
 
   let lastMessage: string | undefined;
 
@@ -149,7 +151,9 @@ async function cachedFirstAvailable<T>(
         const resolvedPayload = lastMessage && payload.sourceStatus === "fallback"
           ? withFallbackMessage(payload, lastMessage)
           : payload;
-        cache.set(key, { expiresAt: now + ttlMs, payload: resolvedPayload });
+        if (!isFallbackFixturePayload(resolvedPayload)) {
+          cache.set(key, { expiresAt: now + ttlMs, payload: resolvedPayload });
+        }
         return resolvedPayload;
       }
       return lastMessage ? withFallbackMessage(payload, lastMessage) : payload;
@@ -184,6 +188,12 @@ function withFallbackMessage<T>(payload: WorldCupPayload<T>, upstreamMessage: st
       ? `${upstreamMessage}；${payload.message}`
       : upstreamMessage
   };
+}
+
+function isFallbackFixturePayload<T>(payload: WorldCupPayload<T>) {
+  if (!Array.isArray(payload.data) || !payload.data.length) return false;
+  const first = payload.data[0] as { source?: { provider?: string } };
+  return first.source?.provider === "worldcup26-free" || first.source?.provider === "thestatsapi-fixtures";
 }
 
 async function requireNonEmpty<T>(
