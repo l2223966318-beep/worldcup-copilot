@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCcw, Search } from "lucide-react";
 
@@ -33,16 +33,6 @@ export function HotTopicRadarPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    const cached = readCache();
-    if (!cached) return;
-    if (cached.sourceStatus === "fallback" && !allowMock) return;
-    setTopics(cached.topics);
-    setLastUpdatedAt(cached.lastUpdatedAt);
-    setSourceStatus(cached.sourceStatus);
-    setMessage(cached.message ?? "");
-  }, [allowMock]);
-
   const rankedTopics = useMemo(() => {
     return topics
       .map((topic) => ({
@@ -62,12 +52,12 @@ export function HotTopicRadarPanel({
     router.push(`/hot-topics/${encodeURIComponent(topic.id)}${query}`);
   }
 
-  async function updateHotTopics() {
+  const updateHotTopics = useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
-      const response = await fetch(`/api/hot?source=all&scope=sports&limit=20&xhsQuery=${encodeURIComponent("世界杯 足球")}`, {
+      const response = await fetch(`/api/hot?source=all&scope=all&limit=20&xhsQuery=${encodeURIComponent("世界杯 足球")}`, {
         cache: "no-store",
         headers: getStoredHotSourceHeaders()
       });
@@ -94,14 +84,21 @@ export function HotTopicRadarPanel({
       setError(requestError instanceof Error ? requestError.message : "热点更新失败。");
       setSourceStatus("error");
       setMessage("");
-      if (!allowMock && sourceStatus === "fallback") {
-        setTopics([]);
-        setLastUpdatedAt("");
-      }
     } finally {
       setLoading(false);
     }
-  }
+  }, [matches]);
+
+  useEffect(() => {
+    const cached = readCache();
+    if (cached && (cached.sourceStatus !== "fallback" || allowMock)) {
+      setTopics(cached.topics);
+      setLastUpdatedAt(cached.lastUpdatedAt);
+      setSourceStatus(cached.sourceStatus);
+      setMessage(cached.message ?? "");
+    }
+    void updateHotTopics();
+  }, [allowMock, updateHotTopics]);
 
   return (
     <aside className="lg:sticky lg:top-24">
