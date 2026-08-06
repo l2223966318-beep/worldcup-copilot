@@ -8,6 +8,7 @@ export type HotRadarCache = {
   lastUpdatedAt: string;
   sourceStatus: HotSearchPayload["sourceStatus"];
   message?: string;
+  savedAt?: number;
 };
 
 export type GeneratedHotPackage = {

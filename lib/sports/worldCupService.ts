@@ -45,7 +45,7 @@ type SourceLoader<T> = {
 
 const cache = new Map<string, CacheEntry<unknown>>();
 
-export async function getWorldCupFixtures(options: { forceRefresh?: boolean } = {}) {
+export async function getWorldCupFixtures() {
   return cachedFirstAvailable(
     "worldcup-fixtures",
     FIXTURE_CACHE_TTL_MS,
@@ -56,8 +56,7 @@ export async function getWorldCupFixtures(options: { forceRefresh?: boolean } = 
       },
       { load: getFreeWorldCup2026Fixtures }
     ],
-    fallbackList,
-    options
+    fallbackList
   );
 }
 
@@ -129,13 +128,12 @@ async function cachedFirstAvailable<T>(
   key: string,
   ttlMs: number,
   sources: SourceLoader<T>[],
-  fallback: (message?: string) => WorldCupPayload<T>,
-  options: { forceRefresh?: boolean } = {}
+  fallback: (message?: string) => WorldCupPayload<T>
 ): Promise<WorldCupPayload<T>> {
   const entry = cache.get(key) as CacheEntry<T> | undefined;
   const now = Date.now();
 
-  if (!options.forceRefresh && entry && entry.expiresAt > now && !isFallbackFixturePayload(entry.payload)) {
+  if (entry && entry.expiresAt > now && !isFallbackFixturePayload(entry.payload)) {
     return { ...entry.payload, sourceStatus: "cache" as SourceStatus };
   }
 

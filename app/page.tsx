@@ -23,8 +23,8 @@ export default function DashboardPage() {
   const [competitionFilter, setCompetitionFilter] = useState("all");
   const { payload, loading, error } = useWorldCupQuery<WorldCupMatch[]>("/api/worldcup/fixtures", 120_000, {
     cacheKey: "worldcup.fixtures.season",
-    staleMs: 0,
-    forceRefreshOnMount: true
+    staleMs: 300_000,
+    revalidateOnMount: false
   });
   const matches = (payload?.data ?? []).filter(isDisplayableFixture);
   const queryFilteredMatches = filterMatchesByQuery(matches, matchSearchQuery);

@@ -15,6 +15,7 @@ import { formatBeijingDateTime } from "@/lib/time/beijingTime";
 type HotTab = "全部" | "微博" | "B站" | "抖音" | "小红书" | "知乎" | "百度" | "头条";
 
 const tabs: HotTab[] = ["全部", "微博", "B站", "抖音", "小红书", "知乎", "百度", "头条"];
+const HOT_RADAR_STALE_MS = 120_000;
 
 export function HotTopicRadarPanel({
   theme,
@@ -52,12 +53,13 @@ export function HotTopicRadarPanel({
     router.push(`/hot-topics/${encodeURIComponent(topic.id)}${query}`);
   }
 
-  const updateHotTopics = useCallback(async () => {
+  const updateHotTopics = useCallback(async (forceRefresh = false) => {
     setLoading(true);
     setError("");
 
     try {
-      const response = await fetch(`/api/hot?source=all&scope=all&limit=20&refresh=1&xhsQuery=${encodeURIComponent("世界杯 足球")}`, {
+      const refreshParam = forceRefresh ? "&refresh=1" : "";
+      const response = await fetch(`/api/hot?source=all&scope=all&limit=20${refreshParam}&xhsQuery=${encodeURIComponent("世界杯 足球")}`, {
         cache: "no-store",
         headers: getStoredHotSourceHeaders()
       });
@@ -73,7 +75,8 @@ export function HotTopicRadarPanel({
         topics: nextTopics,
         lastUpdatedAt: payload.lastUpdated,
         sourceStatus: payload.sourceStatus,
-        message: payload.message
+        message: payload.message,
+        savedAt: Date.now()
       };
       writeCache(nextCache);
       setTopics(nextTopics);
@@ -91,13 +94,16 @@ export function HotTopicRadarPanel({
 
   useEffect(() => {
     const cached = readCache();
-    if (cached && (cached.sourceStatus !== "fallback" || allowMock)) {
+    const canUseCache = cached && (cached.sourceStatus !== "fallback" || allowMock);
+    if (canUseCache) {
       setTopics(cached.topics);
       setLastUpdatedAt(cached.lastUpdatedAt);
       setSourceStatus(cached.sourceStatus);
       setMessage(cached.message ?? "");
     }
-    void updateHotTopics();
+    if (!canUseCache || !isFreshCache(cached)) {
+      void updateHotTopics();
+    }
   }, [allowMock, updateHotTopics]);
 
   return (
@@ -110,7 +116,7 @@ export function HotTopicRadarPanel({
           </div>
           <button
             type="button"
-            onClick={updateHotTopics}
+            onClick={() => void updateHotTopics(true)}
             disabled={loading}
             className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-semibold text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
             style={{ backgroundColor: theme.primary, boxShadow: `0 14px 30px ${theme.heroGlow}` }}
@@ -270,6 +276,10 @@ function readCache(): HotRadarCache | null {
 function writeCache(cache: HotRadarCache) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(HOT_RADAR_CACHE_KEY, JSON.stringify(cache));
+}
+
+function isFreshCache(cache: HotRadarCache | null) {
+  return Boolean(cache?.savedAt && Date.now() - cache.savedAt < HOT_RADAR_STALE_MS);
 }
 
 function getStoredHotSourceHeaders() {

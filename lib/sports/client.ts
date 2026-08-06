@@ -14,7 +14,7 @@ type QueryOptions = {
   enabled?: boolean;
   cacheKey?: string;
   staleMs?: number;
-  forceRefreshOnMount?: boolean;
+  revalidateOnMount?: boolean;
 };
 
 export function useWorldCupQuery<T>(
@@ -25,7 +25,7 @@ export function useWorldCupQuery<T>(
   const enabled = options.enabled ?? true;
   const cacheKey = options.cacheKey ?? `worldcup.query.${url}`;
   const staleMs = options.staleMs ?? 120_000;
-  const forceRefreshOnMount = options.forceRefreshOnMount ?? false;
+  const revalidateOnMount = options.revalidateOnMount ?? true;
   const [state, setState] = useState<QueryState<T>>(() => {
     if (!enabled) return { loading: false };
     const cached = readCachedPayload<T>(cacheKey, staleMs);
@@ -50,10 +50,9 @@ export function useWorldCupQuery<T>(
       setState((current) => ({ ...current, loading: !current.payload }));
     }
 
-    async function load(forceRefresh = false) {
+    async function load() {
       try {
-        const requestUrl = forceRefresh ? appendRefreshParam(url) : url;
-        const response = await fetch(requestUrl, { cache: "no-store" });
+        const response = await fetch(url, { cache: "no-store" });
         if (!response.ok) throw new Error(`Request failed: ${response.status}`);
         const payload = (await response.json()) as WorldCupPayload<T>;
         if (!active) return;
@@ -73,21 +72,17 @@ export function useWorldCupQuery<T>(
       }
     }
 
-    void load(forceRefreshOnMount);
+    if (!cached || revalidateOnMount) {
+      void load();
+    }
 
     return () => {
       active = false;
       if (timer) window.clearTimeout(timer);
     };
-  }, [cacheKey, enabled, forceRefreshOnMount, refreshMs, staleMs, url]);
+  }, [cacheKey, enabled, refreshMs, revalidateOnMount, staleMs, url]);
 
   return state;
-}
-
-function appendRefreshParam(url: string) {
-  const target = new URL(url, window.location.origin);
-  target.searchParams.set("refresh", "1");
-  return `${target.pathname}${target.search}`;
 }
 
 function readCachedPayload<T>(cacheKey: string, staleMs: number): WorldCupPayload<T> | undefined {
