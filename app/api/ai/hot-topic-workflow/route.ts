@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { generateDeepSeekJson } from "@/lib/ai/deepseek";
+import { generateDeepSeekJson, getDeepSeekFallbackMessage } from "@/lib/ai/deepseek";
 import { qualityControl } from "@/lib/ai/quality";
 import {
   auditHotDraft,
@@ -141,14 +141,14 @@ async function handleGenerate(topic: HotTopic, config: HotGenerationConfig, apiK
         })
       }
     ],
-    { timeoutMs: HOT_WORKFLOW_GENERATE_TIMEOUT_MS, apiKey, quality: "quality", reasoningEffort: "high" }
+    { timeoutMs: HOT_WORKFLOW_GENERATE_TIMEOUT_MS, apiKey, quality: "fast", maxTokens: 1_800 }
   );
 
   if (!result.ok) {
     return NextResponse.json({
-      sourceStatus: result.message.includes("DEEPSEEK_API_KEY") ? "fallback" : "error",
+      sourceStatus: "fallback",
       draft: fallbackDraft,
-      message: result.message
+      message: getDeepSeekFallbackMessage(result.message)
     });
   }
 
@@ -200,14 +200,14 @@ async function handleAudit(topic: HotTopic, config: HotGenerationConfig, draft: 
         })
       }
     ],
-    { timeoutMs: HOT_WORKFLOW_AUDIT_TIMEOUT_MS, apiKey, quality: "quality", reasoningEffort: "high" }
+    { timeoutMs: HOT_WORKFLOW_AUDIT_TIMEOUT_MS, apiKey, quality: "fast", maxTokens: 1_500 }
   );
 
   if (!result.ok) {
     return NextResponse.json({
-      sourceStatus: result.message.includes("DEEPSEEK_API_KEY") ? "fallback" : "error",
+      sourceStatus: "fallback",
       audit: fallbackAudit,
-      message: result.message
+      message: getDeepSeekFallbackMessage(result.message)
     });
   }
 

@@ -1,4 +1,4 @@
-import { generateDeepSeekJson } from "@/lib/ai/deepseek";
+import { generateDeepSeekJson, getDeepSeekFallbackMessage } from "@/lib/ai/deepseek";
 import { cleanText, ensurePublishable } from "@/lib/ai/quality";
 import { contentTypeOptions, platformLabel, topicModeOptions, type ContentTypeKey, type TopicModeKey } from "@/lib/services/contentService";
 import type { AnalysisResult, MatchContext, PlatformDraft, PlatformKey, WorkflowTopic } from "@/types/workflow";
@@ -115,13 +115,13 @@ export async function generatePlatformDraftWithAi(input: {
         })
       }
     ],
-    { timeoutMs: 24_000, apiKey, quality: "quality", reasoningEffort: "high" }
+    { timeoutMs: 30_000, apiKey, quality: "fast", maxTokens: 2_000 }
   );
 
   if (!result.ok) {
     return {
-      sourceStatus: result.message.includes("DEEPSEEK_API_KEY") ? "fallback" : "error",
-      message: result.message
+      sourceStatus: "fallback",
+      message: getDeepSeekFallbackMessage(result.message)
     };
   }
 

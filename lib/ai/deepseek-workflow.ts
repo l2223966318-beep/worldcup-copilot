@@ -1,6 +1,6 @@
 import type { MatchData } from "@/data/matches";
-import { generatePlatformContent, type PlatformContent } from "@/lib/ai/content";
-import { generateDeepSeekJson } from "@/lib/ai/deepseek";
+import type { PlatformContent } from "@/lib/ai/content";
+import { generateDeepSeekJson, getDeepSeekFallbackMessage } from "@/lib/ai/deepseek";
 import { cleanList, cleanTitle, ensurePublishable, qualityControl } from "@/lib/ai/quality";
 import { buildSignalContext } from "@/lib/ai/signals";
 import type { TopicCategory, TopicIdea, TopicRecommendation } from "@/lib/ai/topics";
@@ -97,7 +97,7 @@ export async function enhanceMatchWorkflowWithDeepSeek(input: {
         role: "user",
         content: JSON.stringify({
           task:
-            "增强 WorldCup Copilot 单场比赛工作流。输出 conclusions 3 条、topics 6 条、platformStrategy 和 platformContent。conclusions 必须分别覆盖：事实摘要、运营判断、风险提醒。topics 必须优先利用 matchSignals 中的乌龙球、球衣被扯破、VAR、争议判罚、冲突、伤病需核验等场上热点信号；没有信号时，再从比分走势、关键球员、技术统计里找角度。选题不是泛泛角度，而是具体做法，必须覆盖客观资讯、球迷讨论、轻松整活、专业分析，可加入球员故事、数据解读、风险安全版等方向；例如“用动漫角色介绍球星定位”“用一分钟时间线讲清绝杀”“用数据卡拆射正效率”。不要只围绕比分或控球率。platformContent 必须贴合当前比赛和主推选题，不要套用无关球员或历史样例。",
+            "增强 WorldCup Copilot 单场比赛工作流。只输出 conclusions 3 条、topics 6 条和 platformStrategy。conclusions 必须分别覆盖：事实摘要、运营判断、风险提醒。topics 必须优先利用 matchSignals 中的场上热点信号；没有信号时，再从比分走势、关键球员、技术统计里找角度。选题必须是具体做法，覆盖客观资讯、球迷讨论、轻松整活和专业分析；例如用动漫角色介绍球星定位、用一分钟时间线讲清绝杀、用数据卡拆射正效率。不要只围绕比分或控球率。严禁输出 platformContent，平台成稿会在用户点击生成时单独处理。",
           outputShape: {
             conclusions: [{ title: "事实摘要/运营判断/风险提醒", body: "80字以内，必须具体", featured: false }],
             topics: [
@@ -166,30 +166,27 @@ export async function enhanceMatchWorkflowWithDeepSeek(input: {
         })
       }
     ],
-    { timeoutMs: 24_000, apiKey, quality: "quality", reasoningEffort: "high" }
+    { timeoutMs: 30_000, apiKey, quality: "fast", maxTokens: 2_600 }
   );
 
   if (!result.ok) {
     return {
       workflowVersion: "platform-content-v1",
-      sourceStatus: result.message.includes("DEEPSEEK_API_KEY") ? "fallback" : "error",
-      message: result.message,
+      sourceStatus: "fallback",
+      message: getDeepSeekFallbackMessage(result.message),
       conclusions: [],
       topics: []
     };
   }
 
   const topics = normalizeTopics(match.id, result.data.topics, baselineTopics);
-  const fallbackContent = generatePlatformContent(match, topics[0] ?? baselineTopics[0]);
-
   return {
     workflowVersion: "platform-content-v1",
     sourceStatus: "live",
     model: result.model,
     conclusions: normalizeConclusions(result.data.conclusions),
     topics,
-    platformStrategy: result.data.platformStrategy,
-    platformContent: normalizePlatformContent(result.data.platformContent, fallbackContent)
+    platformStrategy: result.data.platformStrategy
   };
 }
 

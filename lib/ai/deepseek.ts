@@ -85,11 +85,24 @@ export async function generateDeepSeekJson<T>(
 
     return { ok: true, data: parseJsonContent<T>(content), model };
   } catch (error) {
+    if (controller.signal.aborted) {
+      return { ok: false, message: "AI request timed out." };
+    }
     const message = error instanceof Error ? error.message : "Unknown DeepSeek error.";
     return { ok: false, message };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export function getDeepSeekFallbackMessage(message: string) {
+  if (message.includes("DEEPSEEK_API_KEY")) {
+    return "未检测到 DeepSeek 配置，已使用本地规则结果。";
+  }
+  if (/timed out|aborted|abort/i.test(message)) {
+    return "AI 响应较慢，已自动使用本地规则结果。";
+  }
+  return "AI 服务暂时不可用，已自动使用本地规则结果。";
 }
 
 function selectModel(options: { model?: string; quality?: "fast" | "quality" }) {

@@ -1,4 +1,4 @@
-import { generateDeepSeekJson } from "@/lib/ai/deepseek";
+import { generateDeepSeekJson, getDeepSeekFallbackMessage } from "@/lib/ai/deepseek";
 import { cleanText, ensurePublishable } from "@/lib/ai/quality";
 import { reviewRisk } from "@/lib/ai/risk";
 import {
@@ -93,13 +93,13 @@ export async function reviewDraftWithAi(input: {
         })
       }
     ],
-    { timeoutMs: 24_000, apiKey: input.apiKey, quality: "quality", reasoningEffort: "high" }
+    { timeoutMs: 30_000, apiKey: input.apiKey, quality: "fast", maxTokens: 1_600 }
   );
 
   if (!result.ok) {
     return {
       sourceStatus: "fallback",
-      message: result.message,
+      message: getDeepSeekFallbackMessage(result.message),
       result: fallbackResult,
       riskPoints: buildRiskPoints(fallbackResult),
       rewriteSuggestion: buildFallbackRewrite(input.draft, fallbackResult),

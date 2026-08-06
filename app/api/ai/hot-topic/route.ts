@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { generateDeepSeekJson } from "@/lib/ai/deepseek";
+import { generateDeepSeekJson, getDeepSeekFallbackMessage } from "@/lib/ai/deepseek";
 import {
   buildHotAnalysis,
   buildTopicIntro,
@@ -94,15 +94,15 @@ export async function POST(request: Request) {
           })
         }
       ],
-      { timeoutMs: HOT_TOPIC_AI_TIMEOUT_MS, apiKey: body.apiKey, quality: "quality", reasoningEffort: "high" }
+      { timeoutMs: HOT_TOPIC_AI_TIMEOUT_MS, apiKey: body.apiKey, quality: "fast", maxTokens: 1_400 }
     );
 
     if (!result.ok) {
       return NextResponse.json({
-        sourceStatus: result.message.includes("DEEPSEEK_API_KEY") ? "fallback" : "error",
+        sourceStatus: "fallback",
         intro: fallbackIntro,
         analysis: fallbackAnalysis,
-        message: result.message
+        message: getDeepSeekFallbackMessage(result.message)
       });
     }
 
