@@ -110,8 +110,8 @@ export async function GET(request: Request) {
       .flatMap((result) => (result.status === "fulfilled" ? result.value.items : []))
       .filter((item) => item.title)
       .filter((item) => source === "all" || matchSource(item, source))
-      .map(enrichValueScore)
       .filter((item) => scope === "all" || isSportsRelated(item))
+      .map(enrichValueScore)
       .filter(dedupeByTitle)
       .sort(sortByValue);
     const items = source === "all" ? balancePlatformCoverage(rankedItems, limit) : rankedItems.slice(0, limit);
