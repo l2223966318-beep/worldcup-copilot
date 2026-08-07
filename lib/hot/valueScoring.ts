@@ -59,7 +59,10 @@ export function valueLevelLabel(level?: HotValueLevel) {
 }
 
 export function isSportsRelatedItem(item: HotItem) {
-  const text = normalize(`${item.title} ${item.summary ?? ""} ${(item.tags ?? []).join(" ")}`);
+  // Radar admission is intentionally based on a visible headline or a
+  // source-provided tag. A vague body paragraph is not enough to label a
+  // trending topic as football content.
+  const text = normalize(`${item.title} ${(item.tags ?? []).join(" ")}`);
   return (
     includesAny(text, WORLD_CUP_TERMS) ||
     includesAny(text, FOOTBALL_TERMS) ||
