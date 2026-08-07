@@ -194,6 +194,21 @@
   z-index: 2;
 }
 
+.pitch-cover-copy::after {
+  background: linear-gradient(180deg, var(--pitch-orange), var(--pitch-gold));
+  content: "";
+  height: 0;
+  left: -30px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+}
+
+.pitch-cover-copy.is-visible::after {
+  animation: pitch-cover-rail-in 760ms 120ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
 .pitch-cover-copy.is-visible {
   pointer-events: auto;
 }
@@ -218,36 +233,97 @@
 
 .pitch-cover-product {
   align-items: center;
-  border: 1px solid rgba(216, 171, 82, 0.62);
   color: white;
-  display: inline-flex;
+  display: grid;
   font-family: Arial, sans-serif;
-  font-size: 14px;
-  font-weight: 800;
-  gap: 10px;
-  margin-bottom: 24px;
-  padding: 9px 14px;
-  text-transform: uppercase;
+  gap: 13px;
+  grid-template-columns: auto auto 1fr;
+  margin-bottom: 25px;
+  width: min(100%, 620px);
 }
 
-.pitch-cover-product > span {
-  background: var(--pitch-gold);
-  border-radius: 50%;
-  box-shadow: 0 0 0 5px rgba(216, 171, 82, 0.13);
-  height: 7px;
-  width: 7px;
+.pitch-cover-product::after {
+  background: linear-gradient(90deg, rgba(240, 90, 40, 0.9), rgba(216, 171, 82, 0.14));
+  content: "";
+  height: 2px;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.pitch-cover-copy.is-visible .pitch-cover-product::after {
+  animation: pitch-cover-line-in 720ms 240ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.pitch-cover-product-index {
+  color: var(--pitch-orange);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.pitch-cover-product strong {
+  font-size: 20px;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 .pitch-cover h1 {
   font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
   font-size: clamp(64px, 5.3vw, 96px);
   font-weight: 900;
-  line-height: 1.03;
+  line-height: 0.98;
   margin: 0;
 }
 
-.pitch-cover h1 span {
+.pitch-cover-title-line {
   display: block;
+  overflow: hidden;
+  padding-bottom: 0.08em;
+  position: relative;
+  width: fit-content;
+}
+
+.pitch-cover-title-line > span {
+  display: block;
+  opacity: 0;
+  transform: translateY(112%);
+}
+
+.pitch-cover-copy.is-visible .pitch-cover-title-line:first-child > span {
+  animation: pitch-cover-title-in 820ms 170ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.pitch-cover-copy.is-visible .pitch-cover-title-line:nth-child(2) > span {
+  animation: pitch-cover-title-in 880ms 270ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.pitch-cover-title-line:nth-child(2)::after {
+  background: linear-gradient(90deg, var(--pitch-orange), var(--pitch-gold));
+  bottom: 0;
+  content: "";
+  height: 4px;
+  left: 0;
+  position: absolute;
+  transform: scaleX(0);
+  transform-origin: left;
+  width: 100%;
+}
+
+.pitch-cover-copy.is-visible .pitch-cover-title-line:nth-child(2)::after {
+  animation: pitch-cover-title-rule 980ms 560ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.pitch-cover-title-line strong {
+  color: var(--pitch-gold);
+  font: inherit;
+  position: relative;
+}
+
+.pitch-cover-title-line i {
+  background: var(--pitch-orange);
+  display: inline-block;
+  height: 0.16em;
+  margin-left: 0.11em;
+  width: 0.16em;
 }
 
 .pitch-cover-tagline {
@@ -255,6 +331,27 @@
   font-weight: 800;
   line-height: 1.4;
   margin: 22px 0 0;
+}
+
+@keyframes pitch-cover-rail-in {
+  0% { height: 0; opacity: 0; }
+  100% { height: 72%; opacity: 1; }
+}
+
+@keyframes pitch-cover-line-in {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes pitch-cover-title-in {
+  0% { opacity: 0; transform: translateY(112%); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pitch-cover-title-rule {
+  0% { opacity: 0; transform: scaleX(0); }
+  45% { opacity: 1; transform: scaleX(1); transform-origin: left; }
+  100% { opacity: 0.72; transform: scaleX(0.22); transform-origin: right; }
 }
 
 .pitch-rule {
@@ -1156,6 +1253,18 @@
   .pitch-cover-product {
     font-size: 12px;
     margin-bottom: 20px;
+  }
+
+  .pitch-cover-product strong {
+    font-size: 16px;
+  }
+
+  .pitch-cover-product-index {
+    font-size: 11px;
+  }
+
+  .pitch-cover-copy::after {
+    left: -12px;
   }
 
   .pitch-cover-media {

@@ -15,7 +15,7 @@ assert.match(page, /href="\/"/, "pitch page must link to the live product");
 assert.match(page, /src="\/videos\/worldcup-hero\.mp4"/, "pitch cover must reuse the product background video");
 assert.match(page, /onEnded=\{finishCoverVideo\}/, "pitch cover must reveal its title after the video ends");
 assert.doesNotMatch(page, /<video[\s\S]*?\sloop[\s\S]*?>/, "pitch cover video must not loop automatically");
-assert.match(page, /把每一场比赛[\s\S]*变成高光时刻/, "pitch cover must use the product statement as its largest title");
+assert.match(page, /把每一场比赛[\s\S]*变成[\s\S]*高光[\s\S]*时刻/, "pitch cover must use the product statement as its largest title");
 assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/, "pitch page must respect reduced-motion preferences");
 assert.match(styles, /height: 100dvh/, "pitch page must use a full-screen stage");
 assert.match(styles, /--pitch-green: #0b8f4d/, "pitch page must retain the football-green visual system");

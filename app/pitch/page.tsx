@@ -211,8 +211,14 @@ export default function PitchPage() {
           </video>
           <div className="pitch-cover-shade" />
           <div className={`pitch-cover-copy ${coverRevealed ? "is-visible" : ""}`} aria-hidden={!coverRevealed}>
-            <div className="pitch-cover-product"><span aria-hidden="true" />WorldCup Copilot</div>
-            <h1><span>把每一场比赛</span><span>变成高光时刻</span></h1>
+            <div className="pitch-cover-product">
+              <span className="pitch-cover-product-index">01 /</span>
+              <strong>WorldCup Copilot</strong>
+            </div>
+            <h1>
+              <span className="pitch-cover-title-line"><span>把每一场比赛</span></span>
+              <span className="pitch-cover-title-line"><span>变成<strong>高光</strong>时刻<i aria-hidden="true" /></span></span>
+            </h1>
             <p className="pitch-cover-tagline">让赛事信号成为内容资产</p>
             <div className="pitch-rule" />
             <p className="pitch-cover-summary">赛事证据 × 内容选题 × 发布审校</p>
