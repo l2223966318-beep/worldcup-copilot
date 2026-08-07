@@ -1,7 +1,7 @@
 import { cleanList, qualityControl } from "@/lib/ai/quality";
 import type { HotSearchPayload, HotTopic, HotValueLevel } from "@/lib/hot/types";
 
-export const HOT_RADAR_CACHE_KEY = "worldcup.hot-topic-radar.cache.v3";
+export const HOT_RADAR_CACHE_KEY = "worldcup.hot-topic-radar.cache.v4";
 
 export type HotRadarCache = {
   topics: HotTopic[];
