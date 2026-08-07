@@ -27,8 +27,8 @@ import {
 } from "@/lib/sports/worldCup2026FreeClient";
 import { getBeijingDateKey } from "@/lib/time/beijingTime";
 
-// Retry a recovered primary source promptly instead of holding a fallback fixture list for ten minutes.
-const FIXTURE_CACHE_TTL_MS = 2 * 60_000;
+// Free schedule sources are stable enough to cache; refetching every request made the dashboard fragile.
+const FIXTURE_CACHE_TTL_MS = 5 * 60_000;
 const ACTIVE_CACHE_TTL_MS = 10 * 60_000;
 const LIVE_CACHE_TTL_MS = 2 * 60_000;
 const ERROR_CACHE_TTL_MS = 2 * 60_000;
@@ -191,9 +191,7 @@ function withFallbackMessage<T>(payload: WorldCupPayload<T>, upstreamMessage: st
 }
 
 function isFallbackFixturePayload<T>(payload: WorldCupPayload<T>) {
-  if (!Array.isArray(payload.data) || !payload.data.length) return false;
-  const first = payload.data[0] as { source?: { provider?: string } };
-  return first.source?.provider === "worldcup26-free" || first.source?.provider === "thestatsapi-fixtures";
+  return payload.sourceStatus === "fallback";
 }
 
 async function requireNonEmpty<T>(

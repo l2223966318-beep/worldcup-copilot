@@ -11,7 +11,9 @@ const WORLD_CUP_2026_LEAGUE = 1;
 const WORLD_CUP_2026_SEASON = 2026;
 const WORLDCUP26_BASE_URL = "https://worldcup26.ir";
 const THE_STATS_API_FIXTURES_URL = "https://www.thestatsapi.com/world-cup/data/fixtures.json";
-const REQUEST_TIMEOUT_MS = Number(process.env.WORLD_CUP_FREE_SOURCE_TIMEOUT_MS ?? 3500);
+const REQUEST_TIMEOUT_MS = Number(process.env.WORLD_CUP_FREE_SOURCE_TIMEOUT_MS ?? 5000);
+const REQUEST_RETRY_COUNT = 1;
+const FREE_SOURCE_REVALIDATE_SECONDS = 300;
 
 type WorldCup26GamesResponse = {
   games?: WorldCup26Game[];
@@ -76,8 +78,12 @@ type TheStatsApiFixture = {
 
 export async function getFreeWorldCup2026Fixtures(): Promise<WorldCupPayload<WorldCupMatch[]>> {
   try {
-    const [games, stadiums] = await Promise.all([getWorldCup26Games(), getWorldCup26Stadiums()]);
-    if (games.length) return createPayload("live", games.map((game) => normalizeWorldCup26Game(game, stadiums)));
+    const games = await getWorldCup26Games();
+    if (games.length) {
+      // Stadium metadata should enrich fixtures, never decide whether fixtures can render.
+      const stadiums = await getWorldCup26Stadiums().catch(() => new Map<string | undefined, WorldCup26Stadium>());
+      return createPayload("live", games.map((game) => normalizeWorldCup26Game(game, stadiums)));
+    }
   } catch {
     // TheStatsAPI static file is the stable fallback for the complete 104-match schedule.
   }
@@ -155,20 +161,33 @@ async function getTheStatsApiFixtures() {
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let lastError: unknown;
 
-  try {
-    const response = await fetch(url, {
-      headers: { Accept: "application/json" },
-      signal: controller.signal
-    });
+  for (let attempt = 0; attempt <= REQUEST_RETRY_COUNT; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-    if (!response.ok) throw new Error(`${url} returned ${response.status}.`);
-    return (await response.json()) as T;
-  } finally {
-    clearTimeout(timeout);
+    try {
+      const response = await fetch(url, {
+        headers: { Accept: "application/json" },
+        cache: "force-cache",
+        next: { revalidate: FREE_SOURCE_REVALIDATE_SECONDS },
+        signal: controller.signal
+      });
+
+      if (!response.ok) throw new Error(`${url} returned ${response.status}.`);
+      return (await response.json()) as T;
+    } catch (error) {
+      lastError = error;
+      if (attempt < REQUEST_RETRY_COUNT) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
   }
+
+  throw lastError instanceof Error ? lastError : new Error(`Unable to load ${url}.`);
 }
 
 function normalizeWorldCup26Game(game: WorldCup26Game, stadiums: Map<string | undefined, WorldCup26Stadium>): WorldCupMatch {
