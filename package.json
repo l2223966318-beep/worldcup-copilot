@@ -21,7 +21,9 @@
     "test:match-detail": "node scripts/test-match-detail-presentation.mjs",
     "test:football-names": "node scripts/test-football-names.mjs",
     "test:static-status": "node scripts/test-static-fixture-status.mjs",
-    "test:time": "node scripts/test-beijing-time.mjs"
+    "test:time": "node scripts/test-beijing-time.mjs",
+    "test:pitch": "node scripts/test-pitch-page.mjs",
+    "test:pitch:browser": "node scripts/qa-pitch.cjs"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.1.0",
