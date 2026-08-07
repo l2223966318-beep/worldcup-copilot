@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties, WheelEvent as ReactWheelEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowRight, Expand, Home, MonitorPlay } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, Expand, Home, MonitorPlay, Pause, Play, RotateCcw, SkipForward } from "lucide-react";
 
 import "./pitch.css";
 
@@ -43,11 +43,63 @@ const platformOutputs = [
 export default function PitchPage() {
   const [active, setActive] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
+  const [coverRevealed, setCoverRevealed] = useState(false);
+  const [coverPaused, setCoverPaused] = useState(false);
+  const [coverProgress, setCoverProgress] = useState(0);
+  const coverVideoRef = useRef<HTMLVideoElement>(null);
   const lastWheelAt = useRef(0);
 
   const goToSlide = useCallback((index: number) => {
     setActive(Math.max(0, Math.min(chapters.length - 1, index)));
   }, []);
+
+  useEffect(() => {
+    const video = coverVideoRef.current;
+    if (!video) return;
+
+    if (active === 0 && !coverRevealed) {
+      void video.play().catch(() => setCoverPaused(true));
+      return;
+    }
+    video.pause();
+  }, [active, coverRevealed]);
+
+  function finishCoverVideo() {
+    setCoverProgress(1);
+    setCoverPaused(true);
+    setCoverRevealed(true);
+  }
+
+  function skipCoverVideo() {
+    const video = coverVideoRef.current;
+    if (video) {
+      video.pause();
+      if (Number.isFinite(video.duration) && video.duration > 0) {
+        video.currentTime = Math.max(0, video.duration - 0.05);
+      }
+    }
+    finishCoverVideo();
+  }
+
+  async function toggleCoverVideo() {
+    const video = coverVideoRef.current;
+    if (!video) return;
+
+    if (coverRevealed) {
+      video.currentTime = 0;
+      setCoverProgress(0);
+      setCoverRevealed(false);
+      setCoverPaused(false);
+      await video.play().catch(() => setCoverPaused(true));
+      return;
+    }
+
+    if (video.paused) {
+      await video.play().catch(() => setCoverPaused(true));
+    } else {
+      video.pause();
+    }
+  }
 
   const requestFullscreen = useCallback(async () => {
     if (!document.fullscreenElement) {
@@ -115,7 +167,7 @@ export default function PitchPage() {
   return (
     <div className={`pitch-shell ${[1, 3, 5].includes(active) ? "pitch-on-light" : ""}`} onWheel={handleWheel}>
       <header className="pitch-toolbar">
-        <Link href="/" className={`pitch-brand ${active > 0 ? "is-hidden" : ""}`} aria-label="退出答辩，返回主系统">
+        <Link href="/" className={`pitch-brand ${active > 0 || !coverRevealed ? "is-hidden" : ""}`} aria-label="退出答辩，返回主系统">
           <span className="pitch-brand-mark">W</span>
           <span>WorldCup Copilot</span>
         </Link>
@@ -138,13 +190,30 @@ export default function PitchPage() {
         style={{ "--pitch-slide": active } as CSSProperties}
         aria-live="polite"
       >
-        <section className="pitch-slide pitch-cover" aria-label="开场">
-          <Image src="/pitch/cover-football.png" alt="夜场草坪上的足球" fill priority sizes="100vw" className="pitch-cover-image" />
+        <section className="pitch-slide pitch-cover" data-revealed={coverRevealed} aria-label="开场">
+          <video
+            ref={coverVideoRef}
+            className="pitch-cover-video"
+            autoPlay
+            muted
+            playsInline
+            preload="auto"
+            poster="/pitch/cover-football.png"
+            onEnded={finishCoverVideo}
+            onPause={() => setCoverPaused(true)}
+            onPlay={() => setCoverPaused(false)}
+            onTimeUpdate={(event) => {
+              const video = event.currentTarget;
+              setCoverProgress(video.duration > 0 ? Math.min(1, video.currentTime / video.duration) : 0);
+            }}
+          >
+            <source src="/videos/worldcup-hero.mp4" type="video/mp4" />
+          </video>
           <div className="pitch-cover-shade" />
-          <div className="pitch-cover-copy pitch-reveal">
-            <p className="pitch-presenter">梁栋 / 26</p>
-            <h1>WORLD CUP<br />COPILOT.</h1>
-            <h2>让赛事信号成为内容资产</h2>
+          <div className={`pitch-cover-copy ${coverRevealed ? "is-visible" : ""}`} aria-hidden={!coverRevealed}>
+            <div className="pitch-cover-product"><span aria-hidden="true" />WorldCup Copilot</div>
+            <h1><span>把每一场比赛</span><span>变成高光时刻</span></h1>
+            <p className="pitch-cover-tagline">让赛事信号成为内容资产</p>
             <div className="pitch-rule" />
             <p className="pitch-cover-summary">赛事证据 × 内容选题 × 发布审校</p>
             <p className="pitch-origin">B站内容运营相关实习观察 / 个人实践项目</p>
@@ -154,6 +223,15 @@ export default function PitchPage() {
               </button>
               <Link href="/" className="pitch-text-link">进入产品实机 <ArrowRight aria-hidden="true" /></Link>
             </div>
+          </div>
+          <div className={`pitch-cover-media ${coverRevealed ? "is-revealed" : ""}`} aria-label="开场视频控制">
+            <button type="button" className="pitch-cover-media-button" onClick={toggleCoverVideo} aria-label={coverRevealed ? "重新播放开场视频" : coverPaused ? "继续播放开场视频" : "暂停开场视频"}>
+              {coverRevealed ? <RotateCcw aria-hidden="true" /> : coverPaused ? <Play aria-hidden="true" /> : <Pause aria-hidden="true" />}
+            </button>
+            <div className="pitch-cover-progress" aria-hidden="true"><span style={{ width: `${coverProgress * 100}%` }} /></div>
+            {!coverRevealed ? (
+              <button type="button" className="pitch-cover-skip" onClick={skipCoverVideo}>跳过片头 <SkipForward aria-hidden="true" /></button>
+            ) : null}
           </div>
           <div className="pitch-cover-index">AIGC 应用大赛 · 四川赛区决赛</div>
         </section>

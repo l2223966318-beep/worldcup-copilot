@@ -17,7 +17,15 @@ async function main() {
     const desktop = await browser.newPage({ viewport: { width: 1366, height: 768 } });
     await desktop.goto(`${baseUrl}/pitch`, { waitUntil: "networkidle" });
     assert.equal(await desktop.locator("main section").count(), 7);
-    assert.match(await desktop.locator("h1").innerText(), /WORLD CUP\s+COPILOT/);
+    assert.equal(await desktop.locator(".pitch-cover-copy").getAttribute("aria-hidden"), "true");
+    await desktop.getByRole("button", { name: "跳过片头" }).click();
+    assert.equal(await desktop.locator(".pitch-cover-copy").getAttribute("aria-hidden"), "false");
+    await desktop.getByRole("button", { name: "重新播放开场视频" }).click();
+    assert.equal(await desktop.locator(".pitch-cover-copy").getAttribute("aria-hidden"), "true");
+    await desktop.locator(".pitch-cover-video").evaluate((video) => video.dispatchEvent(new Event("ended")));
+    await desktop.waitForTimeout(650);
+    assert.match(await desktop.locator("h1").innerText(), /把每一场比赛\s+变成高光时刻/);
+    assert.equal(await desktop.locator(".pitch-cover-copy").getAttribute("aria-hidden"), "false");
     await desktop.screenshot({ path: path.join(outputDir, "pitch-1366-cover.png") });
 
     await desktop.keyboard.press("ArrowDown");
@@ -43,10 +51,14 @@ async function main() {
 
     const wide = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
     await wide.goto(`${baseUrl}/pitch`, { waitUntil: "networkidle" });
+    await wide.locator(".pitch-cover-video").evaluate((video) => video.dispatchEvent(new Event("ended")));
+    await wide.waitForTimeout(650);
     await wide.screenshot({ path: path.join(outputDir, "pitch-1920-cover.png") });
 
     const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
     await mobile.goto(`${baseUrl}/pitch`, { waitUntil: "networkidle" });
+    await mobile.locator(".pitch-cover-video").evaluate((video) => video.dispatchEvent(new Event("ended")));
+    await mobile.waitForTimeout(650);
     await mobile.screenshot({ path: path.join(outputDir, "pitch-mobile-cover.png") });
 
     console.log(JSON.stringify({ sections: 7, keyboard: true, progress: true, links: true, screenshots: 9 }));
