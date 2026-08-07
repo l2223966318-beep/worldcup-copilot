@@ -56,7 +56,12 @@ export function valueLevelLabel(level?: HotValueLevel) {
 }
 
 export function isSportsRelatedItem(item: HotItem) {
-  return scoreHotItem(item).relevanceScore >= 12;
+  const text = normalize(`${item.title} ${item.summary ?? ""} ${(item.tags ?? []).join(" ")}`);
+  return (
+    includesAny(text, WORLD_CUP_TERMS) ||
+    includesAny(text, FOOTBALL_TERMS) ||
+    includesAny(text, PLAYER_TERMS)
+  );
 }
 
 function getHeatScore(heat: unknown, rank?: number) {

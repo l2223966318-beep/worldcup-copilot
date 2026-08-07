@@ -141,7 +141,9 @@ function createHotItem(input: {
   context: HotSearchContext;
 }): HotItem {
   const text = `${input.title} ${input.summary}`;
-  const tags = extractTags(`${text} ${input.context.query}`);
+  // Tags describe the source item itself. Including the search query here made
+  // every result look like a World Cup topic even when the source was unrelated.
+  const tags = extractTags(text);
 
   return {
     id: stableId(`${input.source}:${input.url || input.title}`),

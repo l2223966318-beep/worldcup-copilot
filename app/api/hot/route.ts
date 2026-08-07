@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import type { HotItem, HotSearchPayload } from "@/lib/hot/types";
 import { fetchDailyHotFeed, normalizeDailyHotBaseUrl } from "@/lib/hot/dailyHotClient";
 import { normalizeDailyHotPayload } from "@/lib/hot/normalizers";
-import { scoreHotItem } from "@/lib/hot/valueScoring";
+import { isSportsRelatedItem, scoreHotItem } from "@/lib/hot/valueScoring";
 import { fetchXiaohongshuHotItems } from "@/lib/hot/xiaohongshuClient";
 
 export const dynamic = "force-dynamic";
@@ -384,7 +384,7 @@ function enrichValueScore(item: HotItem): HotItem {
 }
 
 function isSportsRelated(item: HotItem) {
-  return (item.relevance ?? 0) >= 12;
+  return isSportsRelatedItem(item);
 }
 
 function normalizeComparableText(value: string) {
