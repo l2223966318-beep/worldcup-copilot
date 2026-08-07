@@ -104,11 +104,6 @@ type SportradarScheduleResponse = {
   schedules?: SportradarSchedule[];
 };
 
-type SportradarSeasonSummariesResponse = {
-  generated_at?: string;
-  summaries?: SportradarSchedule[];
-};
-
 type SportradarSummaryResponse = {
   generated_at?: string;
   sport_event?: SportradarSportEvent;
@@ -150,8 +145,8 @@ export async function getSportradarWorldCupFixtures(): Promise<WorldCupPayload<W
     throw new Error("SPORTRADAR_WORLD_CUP_SEASON_ID is required for the full Sportradar schedule.");
   }
 
-  const payload = await getSeasonSummaries(config);
-  const matches = normalizeSchedules(payload.summaries ?? [], payload.generated_at);
+  const payload = await getSeasonSchedules(config);
+  const matches = normalizeSchedules(payload.schedules ?? [], payload.generated_at);
   if (!matches.length) throw new Error("Sportradar returned no fixtures for the configured season.");
   return createPayload("live", matches);
 }
@@ -159,8 +154,8 @@ export async function getSportradarWorldCupFixtures(): Promise<WorldCupPayload<W
 export async function getSportradarWorldCupToday(date: string): Promise<WorldCupPayload<WorldCupMatch[]>> {
   const config = getSportradarConfig();
   if (config.seasonId) {
-    const payload = await getSeasonSummaries(config);
-    const matches = dedupeMatches(normalizeSchedules(payload.summaries ?? [], payload.generated_at)).filter(
+    const payload = await getSeasonSchedules(config);
+    const matches = dedupeMatches(normalizeSchedules(payload.schedules ?? [], payload.generated_at)).filter(
       (match) => getBeijingDateKeyFromValue(match.kickoffTime) === date
     );
     return createPayload("live", matches, matches.length ? undefined : "No Sportradar matches for this Beijing date.");
@@ -185,31 +180,31 @@ export async function getSportradarWorldCupToday(date: string): Promise<WorldCup
   return createPayload("live", matches, matches.length ? undefined : "No Sportradar matches for this Beijing date.");
 }
 
-async function getSeasonSummaries(config: SportradarConfig) {
+async function getSeasonSchedules(config: SportradarConfig) {
   if (!config.seasonId) {
-    throw new Error("SPORTRADAR_WORLD_CUP_SEASON_ID is required for season summaries.");
+    throw new Error("SPORTRADAR_WORLD_CUP_SEASON_ID is required for season schedules.");
   }
 
-  const firstPage = await fetchSportradarJson<SportradarSeasonSummariesResponse>(
+  const firstPage = await fetchSportradarJson<SportradarScheduleResponse>(
     config,
-    `seasons/${encodeURIComponent(config.seasonId)}/summaries.json`,
+    `seasons/${encodeURIComponent(config.seasonId)}/schedules.json`,
     false,
     { limit: String(SEASON_SUMMARIES_PAGE_SIZE) }
   );
 
-  const firstSummaries = firstPage.summaries ?? [];
-  if (firstSummaries.length < SEASON_SUMMARIES_PAGE_SIZE) return firstPage;
+  const firstSchedules = firstPage.schedules ?? [];
+  if (firstSchedules.length < SEASON_SUMMARIES_PAGE_SIZE) return firstPage;
 
-  const nextPage = await fetchSportradarJson<SportradarSeasonSummariesResponse>(
+  const nextPage = await fetchSportradarJson<SportradarScheduleResponse>(
     config,
-    `seasons/${encodeURIComponent(config.seasonId)}/summaries.json`,
+    `seasons/${encodeURIComponent(config.seasonId)}/schedules.json`,
     false,
     { limit: String(SEASON_SUMMARIES_PAGE_SIZE), start: String(SEASON_SUMMARIES_PAGE_SIZE) }
   ).catch(() => undefined);
 
   return {
     generated_at: firstPage.generated_at ?? nextPage?.generated_at,
-    summaries: [...firstSummaries, ...(nextPage?.summaries ?? [])]
+    schedules: [...firstSchedules, ...(nextPage?.schedules ?? [])]
   };
 }
 
