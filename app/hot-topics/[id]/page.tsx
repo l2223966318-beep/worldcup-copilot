@@ -435,7 +435,6 @@ export default function HotTopicDetailPage() {
           </p>
           {analysisMessage ? <p className="mt-4 text-xs leading-5 text-slate-500">{analysisMessage}</p> : null}
           {auditMessage && auditStatus !== "error" ? <p className="mt-2 text-xs leading-5 text-slate-500">{auditMessage}</p> : null}
-          {cacheMeta.message ? <p className="mt-2 text-xs leading-5 text-slate-500">{cacheMeta.message}</p> : null}
         </Panel>
       </section>
     </div>
