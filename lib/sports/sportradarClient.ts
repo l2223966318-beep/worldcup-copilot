@@ -7,7 +7,7 @@ const WORLD_CUP_SEASON = 2026;
 const DEFAULT_ACCESS_LEVEL = "trial";
 const DEFAULT_LANGUAGE_CODE = "en";
 const REQUEST_TIMEOUT_MS = Number(process.env.SPORTRADAR_TIMEOUT_MS ?? 12_000);
-const SEASON_SUMMARIES_PAGE_SIZE = 100;
+const SEASON_SCHEDULE_PAGE_SIZE = 1000;
 
 type SportradarNamed = {
   id?: string;
@@ -185,27 +185,12 @@ async function getSeasonSchedules(config: SportradarConfig) {
     throw new Error("SPORTRADAR_WORLD_CUP_SEASON_ID is required for season schedules.");
   }
 
-  const firstPage = await fetchSportradarJson<SportradarScheduleResponse>(
+  return fetchSportradarJson<SportradarScheduleResponse>(
     config,
     `seasons/${encodeURIComponent(config.seasonId)}/schedules.json`,
     false,
-    { limit: String(SEASON_SUMMARIES_PAGE_SIZE) }
+    { limit: String(SEASON_SCHEDULE_PAGE_SIZE) }
   );
-
-  const firstSchedules = firstPage.schedules ?? [];
-  if (firstSchedules.length < SEASON_SUMMARIES_PAGE_SIZE) return firstPage;
-
-  const nextPage = await fetchSportradarJson<SportradarScheduleResponse>(
-    config,
-    `seasons/${encodeURIComponent(config.seasonId)}/schedules.json`,
-    false,
-    { limit: String(SEASON_SUMMARIES_PAGE_SIZE), start: String(SEASON_SUMMARIES_PAGE_SIZE) }
-  ).catch(() => undefined);
-
-  return {
-    generated_at: firstPage.generated_at ?? nextPage?.generated_at,
-    schedules: [...firstSchedules, ...(nextPage?.schedules ?? [])]
-  };
 }
 
 export async function getSportradarWorldCupLive(): Promise<WorldCupPayload<WorldCupMatch[]>> {
