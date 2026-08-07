@@ -14,8 +14,18 @@ export type SourceDebugResult = {
     itemCount?: number;
     matchedWorldCupCount?: number;
     message?: string;
+    seasonSchedule?: SourceEndpointDebug;
+    seasonSummaries?: SourceEndpointDebug;
   };
   fallbackHint: string;
+};
+
+type SourceEndpointDebug = {
+  attempted: boolean;
+  ok: boolean;
+  status?: number;
+  itemCount?: number;
+  message?: string;
 };
 
 type SportradarSeasonCandidate = {
@@ -126,12 +136,64 @@ export async function getSportradarSourceDebug(): Promise<SourceDebugResult> {
       result.fallbackHint = "Sportradar 连接成功。若业务接口仍 fallback，请检查赛季/赛事 ID 或当天是否有匹配赛程。";
     }
 
+    if (seasonId) {
+      const baseUrl = `https://api.sportradar.com/soccer/${accessLevel}/v4/${languageCode}`;
+      const encodedSeasonId = encodeURIComponent(seasonId);
+      const [seasonSchedule, seasonSummaries] = await Promise.all([
+        inspectSportradarSeasonEndpoint(`${baseUrl}/seasons/${encodedSeasonId}/schedules.json`, apiKey, "schedules"),
+        inspectSportradarSeasonEndpoint(`${baseUrl}/seasons/${encodedSeasonId}/summaries.json`, apiKey, "summaries")
+      ]);
+      result.sportradar.seasonSchedule = seasonSchedule;
+      result.sportradar.seasonSummaries = seasonSummaries;
+    }
+
     return result;
   } catch (error) {
     result.sportradar.message = error instanceof Error ? error.message : "Unknown Sportradar request error.";
     result.fallbackHint = "Sportradar 请求异常，线上会继续走免费源兜底。";
     console.error("[sportradar-debug]", result.sportradar.message);
     return result;
+  }
+}
+
+async function inspectSportradarSeasonEndpoint(
+  endpoint: string,
+  apiKey: string,
+  collectionKey: "schedules" | "summaries"
+): Promise<SourceEndpointDebug> {
+  const url = new URL(endpoint);
+  url.searchParams.set("api_key", apiKey);
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        accept: "application/json",
+        "x-api-key": apiKey
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000)
+    });
+    const result: SourceEndpointDebug = {
+      attempted: true,
+      ok: response.ok,
+      status: response.status
+    };
+
+    if (!response.ok) {
+      result.message = await response.text().then((body) => body.slice(0, 160)).catch(() => "");
+      return result;
+    }
+
+    const payload = (await response.json()) as Record<string, unknown>;
+    const items = payload[collectionKey];
+    result.itemCount = Array.isArray(items) ? items.length : 0;
+    return result;
+  } catch (error) {
+    return {
+      attempted: true,
+      ok: false,
+      message: error instanceof Error ? error.message : "Unknown Sportradar request error."
+    };
   }
 }
 
