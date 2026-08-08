@@ -51,6 +51,8 @@ const platformLabels = {
   article: "公众号"
 } as const;
 const SETTINGS_STORAGE_KEY = "worldcup.datasource.settings";
+const AI_WORKFLOW_MAX_ATTEMPTS = 2;
+const AI_WORKFLOW_RETRY_DELAY_MS = 900;
 
 type PlatformKey = keyof typeof platformLabels;
 type PlatformFit = "主推" | "可做" | "谨慎";
@@ -169,29 +171,45 @@ export default function MatchAnalysisPage() {
     setAiEnhancement(null);
     setAiLoading(true);
 
-    fetch("/api/ai/match-workflow", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ match, baselineTopics, apiKey: getStoredDeepseekKey() || undefined }),
-      signal: controller.signal
-    })
-      .then((response) => response.json())
-      .then((payload: AiWorkflowEnhancement) => {
-        if (!controller.signal.aborted) setAiEnhancement(payload);
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted) {
-          setAiEnhancement({
+    async function loadAiWorkflow() {
+      const requestBody = JSON.stringify({ match, baselineTopics, apiKey: getStoredDeepseekKey() || undefined });
+      let latestPayload: AiWorkflowEnhancement | null = null;
+
+      for (let attempt = 1; attempt <= AI_WORKFLOW_MAX_ATTEMPTS; attempt += 1) {
+        try {
+          const response = await fetch("/api/ai/match-workflow", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: requestBody,
+            signal: controller.signal
+          });
+          const payload = (await response.json()) as AiWorkflowEnhancement;
+          if (!response.ok) throw new Error(payload.message || `AI workflow request failed with ${response.status}.`);
+          latestPayload = payload;
+          if (payload.sourceStatus === "live") break;
+        } catch (error) {
+          if (controller.signal.aborted) return;
+          latestPayload = {
             sourceStatus: "error",
             conclusions: [],
             topics: [],
             message: error instanceof Error ? error.message : "AI workflow request failed."
-          });
+          };
         }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setAiLoading(false);
-      });
+
+        if (attempt < AI_WORKFLOW_MAX_ATTEMPTS) {
+          await new Promise<void>((resolve) => setTimeout(resolve, AI_WORKFLOW_RETRY_DELAY_MS));
+          if (controller.signal.aborted) return;
+        }
+      }
+
+      if (!controller.signal.aborted) {
+        if (latestPayload) setAiEnhancement(latestPayload);
+        setAiLoading(false);
+      }
+    }
+
+    void loadAiWorkflow();
 
     return () => controller.abort();
   }, [baselineTopics, match]);

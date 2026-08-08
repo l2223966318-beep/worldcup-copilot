@@ -13,5 +13,9 @@ assert.match(source, /const \[reviewedDraft, setReviewedDraft\] = useState\(""\)
 assert.match(source, /const reviewFlow = reviewedDraft === reviewSourceText && reviewedDraft/);
 assert.match(source, /setReviewedDraft\(draftSnapshot\)/);
 assert.match(source, /onChange=\{\(event\) => \{[\s\S]*?setReviewedDraft\(""\)/);
+assert.match(source, /const AI_WORKFLOW_MAX_ATTEMPTS = 2/);
+assert.match(source, /for \(let attempt = 1; attempt <= AI_WORKFLOW_MAX_ATTEMPTS; attempt \+= 1\)/);
+assert.match(source, /payload\.sourceStatus === "live"/);
+assert.match(source, /setTimeout\(resolve, AI_WORKFLOW_RETRY_DELAY_MS\)/);
 
 console.log("match platform controls ok");
