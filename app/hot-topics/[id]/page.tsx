@@ -18,6 +18,7 @@ import {
   type HotGenerationConfig,
   type HotRadarCache
 } from "@/lib/hot/hotTopicWorkflow";
+import { readHotTopicAiCache, writeHotTopicAiCache } from "@/lib/services/hotTopicAiCache";
 import { formatBeijingDateTime } from "@/lib/time/beijingTime";
 
 const defaultConfig: HotGenerationConfig = {
@@ -34,8 +35,6 @@ const contentTypes: HotGenerationConfig["contentType"][] = ["选题", "标题", 
 const tones: HotGenerationConfig["tone"][] = ["专业复盘", "客观资讯", "球迷讨论", "轻松整活", "人物故事", "数据解读", "稳妥表达"];
 const lengths: HotGenerationConfig["length"][] = ["短", "中", "长"];
 const SETTINGS_STORAGE_KEY = "worldcup.datasource.settings";
-const HOT_TOPIC_ANALYSIS_CACHE_KEY = "worldcup.hot-topic-analysis.v1";
-const HOT_TOPIC_ANALYSIS_CACHE_TTL_MS = 6 * 60 * 60_000;
 
 export default function HotTopicDetailPage() {
   const params = useParams();
@@ -65,7 +64,7 @@ export default function HotTopicDetailPage() {
 
   useEffect(() => {
     const snapshot = readHotTopicSnapshot(topicId);
-    setTopic(snapshot.topic);
+    setTopic((current) => (JSON.stringify(current) === JSON.stringify(snapshot.topic) ? current : snapshot.topic));
     setCacheMeta(snapshot.cacheMeta);
     setLoaded(true);
   }, [topicId]);
@@ -102,16 +101,29 @@ export default function HotTopicDetailPage() {
     }
 
     const fallbackAnalysisSnapshot = fallbackAnalysis ?? buildHotAnalysis(topic);
-    const cachedAnalysis = readHotTopicAnalysis(topic.id);
-    setAnalysis(cachedAnalysis?.analysis ?? fallbackAnalysisSnapshot);
-    setTopicIntro(cachedAnalysis?.intro ?? fallbackIntro);
-    setAnalysisStatus(cachedAnalysis ? "cache" : "loading");
+    const cachedAnalysis = readHotTopicAiCache<{
+      sourceStatus: "live";
+      intro: string;
+      analysis: HotAnalysisResult;
+    }>(window.localStorage, topic);
+    if (cachedAnalysis) {
+      setAnalysis(cachedAnalysis.analysis);
+      setTopicIntro(cachedAnalysis.intro);
+      setAnalysisStatus("cache");
+      setAnalysisMessage("");
+      return;
+    }
+
+    setAnalysis(fallbackAnalysisSnapshot);
+    setTopicIntro(fallbackIntro);
+    setAnalysisStatus("loading");
     setAnalysisMessage("");
+    const currentDeepseekKey = getStoredDeepseekKey();
 
     void fetch("/api/ai/hot-topic", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic, apiKey: deepseekKey || undefined })
+      body: JSON.stringify({ topic, apiKey: currentDeepseekKey || undefined })
     })
       .then(async (response) => {
         const payload = (await response.json()) as {
@@ -127,8 +139,12 @@ export default function HotTopicDetailPage() {
         setAnalysis(nextAnalysis);
         setAnalysisStatus(payload.sourceStatus === "live" ? "live" : payload.sourceStatus === "fallback" ? "fallback" : "error");
         setAnalysisMessage(payload.message || "");
-        if (payload.sourceStatus === "live" || payload.sourceStatus === "fallback") {
-          writeHotTopicAnalysis(topic.id, { intro: nextIntro, analysis: nextAnalysis });
+        if (payload.sourceStatus === "live") {
+          writeHotTopicAiCache(window.localStorage, topic, {
+            sourceStatus: "live",
+            intro: nextIntro,
+            analysis: nextAnalysis
+          });
         }
       })
       .catch((error) => {
@@ -142,7 +158,7 @@ export default function HotTopicDetailPage() {
     return () => {
       active = false;
     };
-  }, [topic, fallbackAnalysis, fallbackIntro, deepseekKey]);
+  }, [topic, fallbackAnalysis, fallbackIntro]);
 
   function updateConfig<Key extends keyof HotGenerationConfig>(key: Key, value: HotGenerationConfig[Key]) {
     setConfig((current) => ({ ...current, [key]: value }));
@@ -299,7 +315,13 @@ export default function HotTopicDetailPage() {
               <MetaItem label="价值" value={topic.leverageValue ?? "待判断"} />
             </div>
             <div className="mt-4 rounded-2xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
-              {analysisStatus === "loading" ? "分析引擎：正在生成精炼判断" : analysisStatus === "live" ? "分析引擎：DeepSeek" : "分析引擎：本地规则兜底"}
+              {analysisStatus === "loading"
+                ? "分析引擎：正在生成精炼判断"
+                : analysisStatus === "live"
+                  ? "分析引擎：DeepSeek"
+                  : analysisStatus === "cache"
+                    ? "分析引擎：DeepSeek 缓存"
+                    : "分析引擎：本地规则兜底"}
             </div>
             {topic.url ? (
               <a href={topic.url} target="_blank" rel="noreferrer" className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-emerald-200 bg-white text-sm font-semibold text-emerald-700 transition hover:-translate-y-0.5">
@@ -616,34 +638,6 @@ function readHotTopicSnapshot(topicId: string): { topic: HotTopic | null; cacheM
     };
   } catch {
     return { topic: null, cacheMeta: {} };
-  }
-}
-
-function readHotTopicAnalysis(topicId: string): { intro: string; analysis: HotAnalysisResult } | null {
-  if (typeof window === "undefined") return null;
-
-  try {
-    const raw = window.sessionStorage.getItem(HOT_TOPIC_ANALYSIS_CACHE_KEY);
-    const cache = raw ? (JSON.parse(raw) as Record<string, { savedAt?: number; intro?: string; analysis?: HotAnalysisResult }>) : {};
-    const entry = cache[topicId];
-    if (!entry?.intro || !entry.analysis || !entry.savedAt) return null;
-    if (Date.now() - entry.savedAt > HOT_TOPIC_ANALYSIS_CACHE_TTL_MS) return null;
-    return { intro: entry.intro, analysis: entry.analysis };
-  } catch {
-    return null;
-  }
-}
-
-function writeHotTopicAnalysis(topicId: string, payload: { intro: string; analysis: HotAnalysisResult }) {
-  if (typeof window === "undefined") return;
-
-  try {
-    const raw = window.sessionStorage.getItem(HOT_TOPIC_ANALYSIS_CACHE_KEY);
-    const cache = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
-    cache[topicId] = { ...payload, savedAt: Date.now() };
-    window.sessionStorage.setItem(HOT_TOPIC_ANALYSIS_CACHE_KEY, JSON.stringify(cache));
-  } catch {
-    // AI analysis can still render without browser storage.
   }
 }
 
