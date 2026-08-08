@@ -22,7 +22,7 @@ for (const file of files) {
   writeFileSync(targetPath, compiled, "utf8");
 }
 
-const { auditHotDraft, generateHotDraft } = await import(`file:///${join(outDir, "lib/hot/hotTopicWorkflow.mjs").replaceAll("\\", "/")}`);
+const { addHotDraftVisualAnchors, auditHotDraft, generateHotDraft } = await import(`file:///${join(outDir, "lib/hot/hotTopicWorkflow.mjs").replaceAll("\\", "/")}`);
 
 const topic = {
   id: "hot-1",
@@ -74,6 +74,16 @@ assert.ok(!topicDraft.includes("开头15秒"));
 const topicEmojiCount = (topicDraft.match(/\p{Extended_Pictographic}/gu) ?? []).length;
 assert.ok(topicEmojiCount >= 3 && topicEmojiCount <= 5);
 assert.doesNotMatch(topicDraft, /^(?:怎么做|说明)：.*\p{Extended_Pictographic}/gmu);
+const sanitizedDraft = addHotDraftVisualAnchors("1. 📊 用xG与射门预期值复盘", {
+  platform: "B站",
+  contentType: "标题",
+  tone: "数据解读",
+  length: "短",
+  useMatchFacts: true,
+  includeRiskReminder: false
+});
+assert.doesNotMatch(sanitizedDraft, /xG|预期进球|射门预期值/i);
+assert.match(sanitizedDraft, /射门与射正数据/);
 
 const pageSource = readFileSync(new URL("../app/hot-topics/[id]/page.tsx", import.meta.url), "utf8");
 assert.match(pageSource, /label="生成类型"/);

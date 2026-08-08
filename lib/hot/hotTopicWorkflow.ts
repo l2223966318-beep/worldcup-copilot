@@ -228,6 +228,7 @@ const DRAFT_EMOJI_PATTERN = /\p{Extended_Pictographic}\uFE0F?/gu;
 
 export function addHotDraftVisualAnchors(draft: string, config: HotGenerationConfig) {
   const lines = draft
+    .replace(/xG|预期进球|射门预期值/gi, "射门与射正数据")
     .replace(DRAFT_EMOJI_PATTERN, "")
     .split("\n")
     .map((line) => line.replace(/[ \t]{2,}/g, " ").trimEnd());
