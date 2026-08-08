@@ -6,6 +6,17 @@ const { chromium } = require("playwright");
 const baseUrl = process.env.PITCH_BASE_URL || "http://127.0.0.1:3035";
 const outputDir = path.resolve(process.cwd(), ".pitch-qa");
 
+async function revealCover(page) {
+  assert.equal(await page.locator(".pitch-cover-copy").getAttribute("aria-hidden"), "true");
+  await page.getByRole("button", { name: "跳过片头" }).click();
+  assert.equal(await page.locator(".pitch-cover-copy").getAttribute("aria-hidden"), "false");
+  await page.getByRole("button", { name: "重新播放开场视频" }).click();
+  assert.equal(await page.locator(".pitch-cover-copy").getAttribute("aria-hidden"), "true");
+  await page.locator(".pitch-cover-video").evaluate((video) => video.dispatchEvent(new Event("ended")));
+  await page.waitForTimeout(1250);
+  assert.match(await page.locator("h1").innerText(), /把每一场比赛\s+变成高光时刻/);
+}
+
 async function main() {
   await fs.mkdir(outputDir, { recursive: true });
   const browser = await chromium.launch({
@@ -16,38 +27,27 @@ async function main() {
   try {
     const desktop = await browser.newPage({ viewport: { width: 1366, height: 768 } });
     await desktop.goto(`${baseUrl}/pitch`, { waitUntil: "networkidle" });
-    assert.equal(await desktop.locator("main section").count(), 7);
-    assert.equal(await desktop.locator(".pitch-cover-copy").getAttribute("aria-hidden"), "true");
-    await desktop.getByRole("button", { name: "跳过片头" }).click();
-    assert.equal(await desktop.locator(".pitch-cover-copy").getAttribute("aria-hidden"), "false");
-    await desktop.getByRole("button", { name: "重新播放开场视频" }).click();
-    assert.equal(await desktop.locator(".pitch-cover-copy").getAttribute("aria-hidden"), "true");
-    await desktop.locator(".pitch-cover-video").evaluate((video) => video.dispatchEvent(new Event("ended")));
-    await desktop.waitForTimeout(1250);
-    assert.match(await desktop.locator("h1").innerText(), /把每一场比赛\s+变成高光时刻/);
-    assert.equal(await desktop.locator(".pitch-cover-copy").getAttribute("aria-hidden"), "false");
+    assert.equal(await desktop.locator("main section").count(), 3);
+    await revealCover(desktop);
     await desktop.screenshot({ path: path.join(outputDir, "pitch-1366-cover.png") });
 
     await desktop.keyboard.press("ArrowDown");
     await desktop.waitForTimeout(520);
-    assert.equal((await desktop.locator(".pitch-footer span").innerText()).trim(), "02 / 07");
-    await desktop.screenshot({ path: path.join(outputDir, "pitch-1366-02.png") });
+    assert.equal((await desktop.locator(".pitch-footer span").innerText()).trim(), "02 / 03");
+    await desktop.screenshot({ path: path.join(outputDir, "pitch-1366-background.png") });
 
-    for (let index = 2; index < 7; index += 1) {
-      await desktop.getByRole("button", { name: `前往第 ${index + 1} 章：${["系统逻辑", "机会判断", "选题生成", "发布审校", "结论"][index - 2]}` }).click();
-      await desktop.waitForTimeout(520);
-      await desktop.screenshot({ path: path.join(outputDir, `pitch-1366-0${index + 1}.png`) });
-    }
-
-    await desktop.getByRole("button", { name: "前往第 5 章：选题生成" }).click();
+    await desktop.getByRole("button", { name: "进入实机演示" }).click();
     await desktop.waitForTimeout(520);
-    assert.equal((await desktop.locator(".pitch-footer span").innerText()).trim(), "05 / 07");
+    assert.equal((await desktop.locator(".pitch-footer span").innerText()).trim(), "03 / 03");
+    assert.equal(await desktop.getByRole("link", { name: /进入 WorldCup Copilot/ }).getAttribute("href"), "/");
+    await desktop.screenshot({ path: path.join(outputDir, "pitch-1366-handoff.png") });
 
-    await desktop.keyboard.press("6");
+    await desktop.keyboard.press("2");
     await desktop.waitForTimeout(520);
-    assert.equal((await desktop.locator(".pitch-footer span").innerText()).trim(), "06 / 07");
-    assert.equal(await desktop.locator('a[href="/matches/argentina-france-2022-final"]').count() > 0, true);
-    assert.equal(await desktop.locator('a[href="/"]').count() > 0, true);
+    assert.equal((await desktop.locator(".pitch-footer span").innerText()).trim(), "02 / 03");
+    await desktop.getByRole("button", { name: "前往第 3 章：进入工具" }).click();
+    await desktop.waitForTimeout(520);
+    assert.equal((await desktop.locator(".pitch-footer span").innerText()).trim(), "03 / 03");
 
     const wide = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
     await wide.goto(`${baseUrl}/pitch`, { waitUntil: "networkidle" });
@@ -61,7 +61,7 @@ async function main() {
     await mobile.waitForTimeout(1250);
     await mobile.screenshot({ path: path.join(outputDir, "pitch-mobile-cover.png") });
 
-    console.log(JSON.stringify({ sections: 7, keyboard: true, progress: true, links: true, screenshots: 9 }));
+    console.log(JSON.stringify({ sections: 3, keyboard: true, handoff: true, links: true, screenshots: 5 }));
   } finally {
     await browser.close();
   }
