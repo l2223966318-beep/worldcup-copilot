@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties, WheelEvent as ReactWheelEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowRight, Expand, Pause, Play, RotateCcw, SkipForward } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, Expand, Pause, Play, RotateCcw, SkipForward, X, ZoomIn } from "lucide-react";
 
 import "./pitch.css";
 
@@ -16,14 +16,24 @@ const backgroundSignals = [
   ["03", "生产链路分散", "数据、热点、选题和审核分布在不同工具与工作环节。"]
 ] as const;
 
+const contextMaterials = [
+  { src: "/pitch/background-hot-daily.png", label: "热点日报", detail: "赛事热点与选题指南" },
+  { src: "/pitch/background-bilibili-cases.png", label: "B站内容案例", detail: "赛后复盘与场外议题" },
+  { src: "/pitch/background-volume-trend.png", label: "收录趋势", detail: "世界杯周期内容变化" },
+  { src: "/pitch/background-content-mix.png", label: "内容结构", detail: "优质内容与站内供给对比" }
+] as const;
+
 export default function PitchPage() {
   const [active, setActive] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
   const [coverRevealed, setCoverRevealed] = useState(false);
   const [coverPaused, setCoverPaused] = useState(false);
   const [coverProgress, setCoverProgress] = useState(0);
+  const [selectedMaterial, setSelectedMaterial] = useState(0);
+  const [materialExpanded, setMaterialExpanded] = useState(false);
   const coverVideoRef = useRef<HTMLVideoElement>(null);
   const lastWheelAt = useRef(0);
+  const currentMaterial = contextMaterials[selectedMaterial];
 
   const goToSlide = useCallback((index: number) => {
     setActive(Math.max(0, Math.min(chapters.length - 1, index)));
@@ -81,6 +91,15 @@ export default function PitchPage() {
     }
     await document.exitFullscreen();
   }, []);
+
+  useEffect(() => {
+    if (!materialExpanded) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setMaterialExpanded(false);
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [materialExpanded]);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -193,35 +212,70 @@ export default function PitchPage() {
         </section>
 
         <section className="pitch-slide pitch-context" aria-label="项目背景">
-          <div className="pitch-context-media" aria-hidden="true">
-            <div className="pitch-context-shot pitch-context-shot-main"><Image src="/pitch/background-hot-daily.png" alt="" fill sizes="56vw" /></div>
-            <div className="pitch-context-shot pitch-context-shot-trend"><Image src="/pitch/background-volume-trend.png" alt="" fill sizes="44vw" /></div>
-            <div className="pitch-context-shot pitch-context-shot-cases"><Image src="/pitch/background-bilibili-cases.png" alt="" fill sizes="22vw" /></div>
-            <div className="pitch-context-shot pitch-context-shot-mix"><Image src="/pitch/background-content-mix.png" alt="" fill sizes="22vw" /></div>
-          </div>
-          <div className="pitch-context-shade" />
           <SlideHeader number="02" label="PROJECT ORIGIN" />
-          <div className="pitch-context-copy pitch-reveal">
-            <p className="pitch-eyebrow">B站内容运营实习观察 / 个人实践项目</p>
-            <h2>内容机会很多，<br />判断时间很少。</h2>
-            <p className="pitch-context-lead">世界杯期间，热点日报、赛后复盘与内容趋势观察暴露出三个连续问题。</p>
-            <div className="pitch-context-signals">
-              {backgroundSignals.map(([number, title, body]) => (
-                <div key={number}>
-                  <span>{number}</span>
-                  <strong>{title}</strong>
-                  <p>{body}</p>
-                </div>
-              ))}
+          <div className="pitch-context-layout pitch-reveal">
+            <div className="pitch-context-copy">
+              <p className="pitch-eyebrow">B站内容运营实习观察 / 个人实践项目</p>
+              <h2>这些工作材料，<br /><span className="pitch-context-title-line">催生了这个工具。</span></h2>
+              <p className="pitch-context-lead">世界杯内容生产中，热点日报、赛后复盘和趋势观察暴露出三个连续问题。</p>
+              <div className="pitch-context-signals">
+                {backgroundSignals.map(([number, title, body]) => (
+                  <div key={number}>
+                    <span>{number}</span>
+                    <div><strong>{title}</strong><p>{body}</p></div>
+                  </div>
+                ))}
+              </div>
+              <div className="pitch-context-conclusion">
+                <span>项目起点</span>
+                <strong>把分散的赛事证据，转成可执行、可审校的内容决策。</strong>
+              </div>
+              <button type="button" onClick={() => goToSlide(2)} className="pitch-primary-button">
+                进入实机演示 <ArrowRight aria-hidden="true" />
+              </button>
             </div>
-            <div className="pitch-context-conclusion">
-              <span>项目起点</span>
-              <strong>把分散的赛事证据，转成可执行、可审校的内容决策。</strong>
+
+            <div className="pitch-material-viewer" aria-label="项目背景材料">
+              <div className="pitch-material-heading">
+                <div><span>实习观察材料</span><strong>{currentMaterial.label}</strong></div>
+                <span>{String(selectedMaterial + 1).padStart(2, "0")} / 04</span>
+              </div>
+              <button
+                type="button"
+                className="pitch-material-stage"
+                onClick={() => setMaterialExpanded(true)}
+                aria-label={`放大查看${currentMaterial.label}`}
+              >
+                <Image key={currentMaterial.src} src={currentMaterial.src} alt={`${currentMaterial.label}：${currentMaterial.detail}`} fill sizes="58vw" priority={selectedMaterial === 0} />
+                <span><ZoomIn aria-hidden="true" /> 放大查看</span>
+              </button>
+              <div className="pitch-material-tabs" role="tablist" aria-label="切换项目背景材料">
+                {contextMaterials.map((material, index) => (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={selectedMaterial === index}
+                    className={selectedMaterial === index ? "is-active" : ""}
+                    key={material.src}
+                    onClick={() => setSelectedMaterial(index)}
+                  >
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    <strong>{material.label}</strong>
+                  </button>
+                ))}
+              </div>
             </div>
-            <button type="button" onClick={() => goToSlide(2)} className="pitch-primary-button">
-              进入实机演示 <ArrowRight aria-hidden="true" />
-            </button>
           </div>
+
+          {materialExpanded ? (
+            <div className="pitch-material-modal" role="dialog" aria-modal="true" aria-label={`${currentMaterial.label}大图`} onClick={() => setMaterialExpanded(false)}>
+              <div className="pitch-material-modal-panel" onClick={(event) => event.stopPropagation()}>
+                <div><strong>{currentMaterial.label}</strong><span>{currentMaterial.detail}</span></div>
+                <button type="button" onClick={() => setMaterialExpanded(false)} aria-label="关闭素材大图"><X aria-hidden="true" /></button>
+                <div className="pitch-material-modal-image"><Image src={currentMaterial.src} alt={`${currentMaterial.label}：${currentMaterial.detail}`} fill sizes="90vw" /></div>
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <section className="pitch-slide pitch-handoff" aria-label="进入工具">

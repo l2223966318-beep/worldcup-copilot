@@ -20,6 +20,9 @@ for (const image of ["background-hot-daily", "background-bilibili-cases", "backg
   assert.match(page, new RegExp(`/pitch/${image}\\.png`), `project background must include ${image}`);
 }
 
+assert.match(page, /className="pitch-material-viewer"/, "project background must present sources in a visible material viewer");
+assert.match(page, /放大查看/, "background materials must support focused viewing");
+assert.doesNotMatch(page, /pitch-context-media|pitch-context-shade/, "project materials must not be dimmed decorative backgrounds");
 assert.doesNotMatch(page, /match-center|match-detail|topic-engine|signals\.png|review\.png|report\.png|stadium\.png|trophy\.png/, "retired presentation imagery must not remain referenced");
 assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/, "pitch page must respect reduced-motion preferences");
 assert.match(styles, /height: 300dvh/, "pitch page track must match the three-chapter structure");

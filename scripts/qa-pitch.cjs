@@ -34,6 +34,16 @@ async function main() {
     await desktop.keyboard.press("ArrowDown");
     await desktop.waitForTimeout(520);
     assert.equal((await desktop.locator(".pitch-footer span").innerText()).trim(), "02 / 03");
+    assert.equal(await desktop.getByRole("tab").count(), 4);
+    await desktop.getByRole("tab", { name: /B站内容案例/ }).click();
+    assert.match(await desktop.locator(".pitch-material-stage img").getAttribute("src"), /background-bilibili-cases/);
+    await desktop.waitForFunction(() => {
+      const image = document.querySelector(".pitch-material-stage img");
+      return image instanceof HTMLImageElement && image.complete && image.currentSrc.includes("background-bilibili-cases");
+    });
+    await desktop.getByRole("button", { name: "放大查看B站内容案例" }).click();
+    assert.equal(await desktop.getByRole("dialog", { name: "B站内容案例大图" }).count(), 1);
+    await desktop.getByRole("button", { name: "关闭素材大图" }).click();
     await desktop.screenshot({ path: path.join(outputDir, "pitch-1366-background.png") });
 
     await desktop.getByRole("button", { name: "进入实机演示" }).click();
