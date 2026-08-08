@@ -28,6 +28,7 @@ import { contentTypeOptions, createPlatformDraft, topicModeOptions, type Content
 import { buildEvidencePack, evidenceLabel } from "@/lib/services/evidenceService";
 import { buildContentReportFilename, createContentPackage, createPackageMarkdown, createPendingReviewResult } from "@/lib/services/exportService";
 import { localizeMatchStatus, localizeRoundName, localizeTeamName, localizeVenueText } from "@/lib/services/footballNames";
+import { readMatchAiWorkflowCache, writeMatchAiWorkflowCache } from "@/lib/services/matchAiCache";
 import {
   buildDraftReviewFlow,
   buildMatchHotspotShortlist,
@@ -110,6 +111,7 @@ export default function MatchAnalysisPage() {
   const baselineTopics = useMemo(() => generateTopics(match).slice(0, 6), [match]);
   const [aiEnhancement, setAiEnhancement] = useState<AiWorkflowEnhancement | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiCacheHit, setAiCacheHit] = useState(false);
   const topics = aiEnhancement?.sourceStatus === "live" && aiEnhancement.topics.length ? aiEnhancement.topics : baselineTopics;
   const [selectedTopicId, setSelectedTopicId] = useState(topics[0]?.id);
   const selectedTopic = topics.find((topic) => topic.id === selectedTopicId) ?? topics[0];
@@ -167,7 +169,18 @@ export default function MatchAnalysisPage() {
   const markdown = useMemo(() => buildMarkdown(match.name, selectedTopic, content, reviewFlow?.result.advice ?? "待审核"), [content, match.name, reviewFlow?.result.advice, selectedTopic]);
 
   useEffect(() => {
+    if (loading && !payload) return;
+
     const controller = new AbortController();
+    const cachedEnhancement = readMatchAiWorkflowCache<AiWorkflowEnhancement>(window.localStorage, match, baselineTopics);
+    if (cachedEnhancement) {
+      setAiEnhancement(cachedEnhancement);
+      setAiLoading(false);
+      setAiCacheHit(true);
+      return;
+    }
+
+    setAiCacheHit(false);
     setAiEnhancement(null);
     setAiLoading(true);
 
@@ -204,7 +217,10 @@ export default function MatchAnalysisPage() {
       }
 
       if (!controller.signal.aborted) {
-        if (latestPayload) setAiEnhancement(latestPayload);
+        if (latestPayload) {
+          setAiEnhancement(latestPayload);
+          writeMatchAiWorkflowCache(window.localStorage, match, baselineTopics, latestPayload);
+        }
         setAiLoading(false);
       }
     }
@@ -212,7 +228,7 @@ export default function MatchAnalysisPage() {
     void loadAiWorkflow();
 
     return () => controller.abort();
-  }, [baselineTopics, match]);
+  }, [baselineTopics, loading, match, payload]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -443,7 +459,7 @@ export default function MatchAnalysisPage() {
         error={error || formatSourceIssue(payload?.message)}
       />
 
-      <AiBrainStatus loading={aiLoading} enhancement={aiEnhancement} theme={theme} />
+      <AiBrainStatus loading={aiLoading} enhancement={aiEnhancement} fromCache={aiCacheHit} theme={theme} />
 
       <section>
         <SectionTitle eyebrow="OPS CONCLUSION" title="运营结论" description="让运营人员 10 秒内知道这场比赛值不值得做、先做什么、要避开什么坑。" />
@@ -856,10 +872,12 @@ function SourceStatusLine({
 function AiBrainStatus({
   loading,
   enhancement,
+  fromCache,
   theme
 }: {
   loading: boolean;
   enhancement: AiWorkflowEnhancement | null;
+  fromCache: boolean;
   theme: SportTheme;
 }) {
   const isLive = enhancement?.sourceStatus === "live";
@@ -872,7 +890,9 @@ function AiBrainStatus({
   const description = loading
     ? "正在把真实比赛数据转成运营结论、选题参考、平台内容预览和分发建议。"
     : isLive
-      ? `当前页面的${liveModules || "运营分析"}由 DS API 实时生成，硬数据来自项目服务端比赛接口。切换到非主推选题时，平台内容会使用本地规则补齐。`
+      ? fromCache
+        ? `已复用本场比赛的${liveModules || "运营分析"}，比赛数据更新后会自动重新分析。`
+        : `当前页面的${liveModules || "运营分析"}由 DS API 生成，硬数据来自项目服务端比赛接口。切换到非主推选题时，平台内容会使用本地规则补齐。`
       : enhancement?.message ?? "未配置 DeepSeek key 或接口暂不可用，页面继续使用本地规则引擎。";
 
   return (
@@ -884,7 +904,7 @@ function AiBrainStatus({
           <p className="mt-1 text-sm leading-6 text-slate-500">{description}</p>
         </div>
         <span className="rounded-full px-3 py-1.5 text-xs font-semibold text-white" style={{ backgroundColor: isLive ? theme.primary : "#64748b" }}>
-          {isLive ? "AI 增强" : "规则兜底"}
+          {isLive ? fromCache ? "AI 缓存" : "AI 增强" : "规则兜底"}
         </span>
       </div>
     </section>

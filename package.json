@@ -13,6 +13,7 @@
     "test:workflow": "node scripts/test-workflow-services.mjs",
     "test:platform-draft": "node scripts/test-platform-draft-source.mjs",
     "test:platform-controls": "node scripts/test-match-platform-controls.mjs",
+    "test:match-ai-cache": "node scripts/test-match-ai-cache.mjs",
     "test:card-hover": "node scripts/test-card-hover.mjs",
     "test:word-export": "node scripts/test-word-export.mjs",
     "test:evidence-review": "node scripts/test-evidence-review.mjs",
