@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { generateDeepSeekJson, getDeepSeekFallbackMessage } from "@/lib/ai/deepseek";
 import { qualityControl } from "@/lib/ai/quality";
 import {
+  addHotDraftVisualAnchors,
   auditHotDraft,
   generateHotDraft,
   type HotAuditResult,
@@ -121,6 +122,7 @@ async function handleGenerate(topic: HotTopic, config: HotGenerationConfig, apiK
           "不同平台必须彻底分开写法，不共用同一套模板。",
           "选择“选题”时只生成正好5个作品角度，每个仅含“角度标题、怎么做、说明”，不能写成完整稿件。",
           "选择其他类型时才生成对应成品，不要混入其他生成类型的结构。",
+          "允许使用 3-5 个与内容相关的 Emoji 作为视觉锚点，只放在标题或结构标题开头；每行最多 1 个；禁止连续堆叠，正文事实句、比分和球员姓名内部不加表情。",
           platformInstruction(config),
           contentTypeInstruction(config),
           styleInstruction(config),
@@ -152,7 +154,8 @@ async function handleGenerate(topic: HotTopic, config: HotGenerationConfig, apiK
     });
   }
 
-  const draft = normalizeGeneratedDraft(result.data.draft, fallbackDraft, config);
+  const normalizedDraft = normalizeGeneratedDraft(result.data.draft, fallbackDraft, config);
+  const draft = addHotDraftVisualAnchors(normalizedDraft, config);
   const payload = {
     sourceStatus: "live",
     draft,
@@ -280,7 +283,7 @@ function lengthInstruction(config: HotGenerationConfig) {
 
 function buildGenerateCacheKey(topic: HotTopic, config: HotGenerationConfig) {
   return [
-    "generate",
+    "generate-visual-v2",
     topic.id,
     topic.title,
     topic.updatedAt ?? "",

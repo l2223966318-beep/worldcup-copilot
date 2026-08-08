@@ -221,7 +221,76 @@ export function generateHotDraft(topic: HotTopic, config: HotGenerationConfig) {
   };
 
   const body = buildPlatformDraft(topic, config, base);
-  return qualityControl(body).trim();
+  return addHotDraftVisualAnchors(qualityControl(body).trim(), config);
+}
+
+const DRAFT_EMOJI_PATTERN = /\p{Extended_Pictographic}\uFE0F?/gu;
+
+export function addHotDraftVisualAnchors(draft: string, config: HotGenerationConfig) {
+  const lines = draft
+    .replace(DRAFT_EMOJI_PATTERN, "")
+    .split("\n")
+    .map((line) => line.replace(/[ \t]{2,}/g, " ").trimEnd());
+
+  if (config.contentType === "选题" || config.contentType === "标题" || config.contentType === "评论区互动") {
+    return decorateNumberedLines(lines, ["🎯", "🎬", "🎮", "📊", "💬"]);
+  }
+
+  if (config.contentType === "视频脚本") {
+    return decorateStructuredLines(lines, [
+      [/^(前三秒|开场)[：:]/, "🎬"],
+      [/^第一段[：:]/, "⚽"],
+      [/^第二段[：:]/, "🔎"],
+      [/^第三段[：:]/, "📊"],
+      [/^结尾互动[：:]/, "💬"]
+    ]);
+  }
+
+  if (config.contentType === "图文卡片") {
+    return decorateStructuredLines(lines, [
+      [/^封面[：:]/, "📌"],
+      [/^第1页[：:]/, "⚽"],
+      [/^第2页[：:]/, "🔥"],
+      [/^第3页[：:]/, "🔎"],
+      [/^第4页[：:]/, "💡"]
+    ]);
+  }
+
+  let anchors = 0;
+  return lines.map((line) => {
+    if (!line.trim() || /^(来源|风险提醒)[：:]/.test(line)) return line;
+    if (anchors === 0) {
+      anchors += 1;
+      return `⚽ ${line}`;
+    }
+    if (anchors === 1 && /[？?]$/.test(line)) {
+      anchors += 1;
+      return `💬 ${line}`;
+    }
+    return line;
+  }).join("\n").trim();
+}
+
+function decorateNumberedLines(lines: string[], anchors: string[]) {
+  let anchorIndex = 0;
+  return lines.map((line) => {
+    const match = line.match(/^(\s*\d+[.、])\s*(\S.*)$/);
+    if (!match || anchorIndex >= anchors.length) return line;
+    const anchor = anchors[anchorIndex];
+    anchorIndex += 1;
+    return `${match[1]} ${anchor} ${match[2]}`;
+  }).join("\n").trim();
+}
+
+function decorateStructuredLines(lines: string[], rules: Array<[RegExp, string]>) {
+  let anchors = 0;
+  return lines.map((line) => {
+    if (anchors >= 5) return line;
+    const rule = rules.find(([pattern]) => pattern.test(line));
+    if (!rule) return line;
+    anchors += 1;
+    return `${rule[1]} ${line}`;
+  }).join("\n").trim();
 }
 
 export function auditHotDraft(

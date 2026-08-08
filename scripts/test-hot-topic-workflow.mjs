@@ -71,6 +71,9 @@ assert.ok(topicDraft.includes("说明："));
 assert.ok(topicDraft.includes("动漫二创"));
 assert.ok(topicDraft.includes("游戏二创"));
 assert.ok(!topicDraft.includes("开头15秒"));
+const topicEmojiCount = (topicDraft.match(/\p{Extended_Pictographic}/gu) ?? []).length;
+assert.ok(topicEmojiCount >= 3 && topicEmojiCount <= 5);
+assert.doesNotMatch(topicDraft, /^(?:怎么做|说明)：.*\p{Extended_Pictographic}/gmu);
 
 const pageSource = readFileSync(new URL("../app/hot-topics/[id]/page.tsx", import.meta.url), "utf8");
 assert.match(pageSource, /label="生成类型"/);
@@ -86,8 +89,9 @@ assert.match(pageSource, /contentEditable/);
 const routeSource = readFileSync(new URL("../app/api/ai/hot-topic-workflow/route.ts", import.meta.url), "utf8");
 assert.match(routeSource, /contentTypeInstruction\(config\)/);
 assert.match(routeSource, /styleInstruction\(config\)/);
-assert.match(routeSource, /normalizeGeneratedDraft\(result\.data\.draft, fallbackDraft, config\)/);
+assert.match(routeSource, /addHotDraftVisualAnchors\(normalizedDraft, config\)/);
 assert.match(routeSource, /topicNumbers\.length !== 5/);
+assert.match(routeSource, /每行最多 1 个/);
 assert.match(routeSource, /没有具体问题时对应数组返回空数组/);
 assert.doesNotMatch(routeSource, /信息不足时必须写“需核实”/);
 
