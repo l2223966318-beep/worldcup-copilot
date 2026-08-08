@@ -9,6 +9,7 @@ export type MatchSignalType =
   | "injury-concern"
   | "late-winner"
   | "goalkeeper-error"
+  | "shot-attempt"
   | "penalty-drama"
   | "milestone"
   | "key-moment";
@@ -116,9 +117,20 @@ const signalRules: SignalRule[] = [
     angleHints: ["必须写需核验", "不写确认伤退", "发布前核验官方消息"]
   },
   {
+    type: "shot-attempt",
+    label: "射门机会",
+    patterns: [/射门偏出|射门被扑出|完成射正|shot_off_target|shot on target|shot.*saved|\bmiss\b/i],
+    contentValue: 68,
+    riskLevel: "低",
+    recommendedPlatforms: ["短视频", "B站"],
+    contentFormats: ["比赛时间线", "机会回合复盘"],
+    topicSeed: (match, event) => buildEventFactTitle(event),
+    angleHints: ["先展示事件事实", "需要画面时标注素材来源", "不要把普通射门包装成绝杀"]
+  },
+  {
     type: "late-winner",
     label: "绝杀/反绝杀",
-    patterns: [/绝杀|反绝杀|补时|读秒|90\+|120\+|stoppage|last minute/i],
+    patterns: [/绝杀|反绝杀|补时进球|读秒进球|stoppage.*goal|last.minute.*goal/i],
     contentValue: 86,
     riskLevel: "低",
     recommendedPlatforms: ["短视频", "B站", "微博"],
@@ -202,7 +214,7 @@ function buildSources(match: MatchData): SignalSource[] {
 
 function matchSourceToSignals(match: MatchData, source: SignalSource) {
   return signalRules
-    .filter((rule) => rule.patterns.some((pattern) => pattern.test(source.text)))
+    .filter((rule) => matchesSignalRule(rule, source))
     .map((rule) => ({
       id: `${match.id}-signal-${rule.type}-${source.index}`,
       type: rule.type,
@@ -218,6 +230,17 @@ function matchSourceToSignals(match: MatchData, source: SignalSource) {
       contentFormats: rule.contentFormats,
       angleHints: rule.angleHints
     } satisfies MatchSignal));
+}
+
+function matchesSignalRule(rule: SignalRule, source: SignalSource) {
+  if (rule.type === "late-winner") {
+    const explicitLateGoal = rule.patterns.some((pattern) => pattern.test(source.text));
+    const lateMinute = /^(?:90|120)\+/.test(source.minute);
+    const isGoal = /进球|破门|扳平|追平|反超|制胜|绝杀|goal|scored/i.test(source.text);
+    return explicitLateGoal || (lateMinute && isGoal);
+  }
+
+  return rule.patterns.some((pattern) => pattern.test(source.text));
 }
 
 function eventToText(event: MatchEvent) {
@@ -257,8 +280,19 @@ function buildEventTopicSeed(match: MatchData, event: SignalSource) {
   return `${minute}${description.replace(/[。.!！?？]$/, "")}`;
 }
 
+function buildEventFactTitle(event: SignalSource) {
+  const description = normalizePlayerName(cleanupEventDescription(event.text, event))
+    .replace(/[。.!！?？]$/, "")
+    .trim();
+  return [event.minute === "-" ? "" : event.minute, description].filter(Boolean).join(" ");
+}
+
+function normalizePlayerName(text: string) {
+  return text.replace(/^([A-Za-zÀ-ÿ.' -]{2,30}),\s*([A-Za-zÀ-ÿ.' -]{2,30})(?=[\u4e00-\u9fff])/, "$2 $1 ");
+}
+
 function cleanupEventDescription(text: string, event: SignalSource) {
-  const knownTypes = ["关键扑救", "进球", "点球", "换人", "黄牌", "争议", "终场"];
+  const knownTypes = ["关键扑救", "射门", "进球", "点球", "换人", "黄牌", "争议", "终场"];
   return text
     .replace(/^\s*(?:\d+(?:\+\d+)?'|点球)\s+/, "")
     .replace(new RegExp(`^${escapeRegExp(event.team)}\\s+`), "")
@@ -272,8 +306,8 @@ function isContentWorthyEvent(event: MatchEvent) {
   const text = eventToText(event).toLowerCase();
   if (event.team === "数据源" || isCoverageWarning(text)) return false;
   if (/injury time shown|throw in|goal kick|free kick|offside|corner kick|period start|period score/.test(text)) return false;
-  if (/shot on target|完成射正|射门被扑出|场上球员/.test(text)) return false;
-  return /进球|点球|关键扑救|争议|黄牌|红牌|换人|乌龙|绝杀|扳平|追平|goal|penalty|card|substitution|own goal/.test(text);
+  if (/场上球员/.test(text)) return false;
+  return /进球|点球|射门|关键扑救|争议|黄牌|红牌|换人|乌龙|绝杀|扳平|追平|goal|shot|miss|penalty|card|substitution|own goal/.test(text);
 }
 
 function isCoverageWarning(text: string) {

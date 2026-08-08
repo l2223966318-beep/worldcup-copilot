@@ -53,4 +53,25 @@ assert.ok(signals.some((signal) => signal.type === "own-goal" && signal.priority
 assert.ok(signals.find((signal) => signal.type === "own-goal").recommendedPlatforms.includes("短视频"));
 assert.ok(signals[0].contentValue > signals.at(-1).contentValue);
 
+const lateMissMatch = {
+  ...match,
+  id: "spain-argentina-final",
+  name: "西班牙 vs 阿根廷",
+  teamA: "西班牙",
+  teamB: "阿根廷",
+  score: "1-0",
+  keyEvents: [
+    { minute: "117'", team: "", type: "射门", description: "Messi, Lionel射门偏出。" },
+    { minute: "120+1'", team: "", type: "射门", description: "Medina, Facundo射门偏出。" },
+    { minute: "120+2'", team: "", type: "射门", description: "Simeone, Giuliano射门偏出。" }
+  ]
+};
+const lateMissSignals = extractMatchSignals(lateMissMatch);
+assert.equal(lateMissSignals.length, 3);
+assert.ok(lateMissSignals.every((signal) => signal.type === "shot-attempt"));
+assert.ok(lateMissSignals.every((signal) => signal.label === "射门机会"));
+assert.ok(lateMissSignals.every((signal) => signal.topicSeed.includes("射门偏出")));
+assert.ok(lateMissSignals.every((signal) => !signal.topicSeed.includes("这次机会没进")));
+assert.ok(lateMissSignals.every((signal) => !signal.topicSeed.includes("绝杀")));
+
 console.log(`signals ok: ${signals.map((signal) => signal.type).join(", ")}`);

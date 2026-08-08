@@ -121,16 +121,20 @@ const hotspots = buildMatchHotspotShortlist({
 assert.equal(hotspots[0].title, "美国队4比1巴拉圭 乌龙球");
 assert.ok(hotspots[0].heatScore > hotspots[1].heatScore);
 assert.ok(hotspots.every((item) =>
-  item.matchReason === "当前对阵" ||
-  item.matchReason === "本场球员或事件" ||
+  item.matchReason === "当前对阵场外讨论" ||
+  item.matchReason === "本场球员场外热议" ||
   item.source === "场上事件"
 ));
 assert.deepEqual(
   new Set(hotspots.map((item) => item.platform)),
   new Set(["抖音", "微博", "小红书", "抖音 / 微博"])
 );
-assert.ok(hotspots.some((item) => item.id === "match-redfox" && item.matchReason === "本场球员或事件"));
+assert.ok(hotspots.some((item) => item.id === "match-redfox" && item.matchReason === "本场球员场外热议"));
 assert.equal(summarizeHotspotSources(hotspots), "抖音、场上事件、微博、小红书");
+const onFieldHotspot = hotspots.find((item) => item.source === "场上事件");
+assert.ok(onFieldHotspot.title.includes("4'"));
+assert.ok(onFieldHotspot.title.includes("乌龙球"));
+assert.ok(!onFieldHotspot.title.includes("如何改变"));
 
 const narrowMatch = {
   ...match,
@@ -175,7 +179,7 @@ const narrowHotspots = buildMatchHotspotShortlist({
 });
 assert.equal(narrowHotspots.length, 1);
 assert.equal(narrowHotspots[0].id, "fixture-match");
-assert.equal(narrowHotspots[0].matchReason, "当前对阵");
+assert.equal(narrowHotspots[0].matchReason, "当前对阵场外讨论");
 
 const mergedPayload = mergeHotSearchPayloads([
   {

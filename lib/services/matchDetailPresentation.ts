@@ -230,7 +230,7 @@ function signalToMatchHotspot(signal: Pick<MatchSignal, "id" | "label" | "minute
     id: signal.id,
     rank: 999,
     kind: "onField",
-    title: signal.topicSeed,
+    title: buildOnFieldEventTitle(signal),
     summary: `${signal.minute}｜${signal.team}｜${signal.evidence}`,
     source: "场上事件",
     platform: signal.recommendedPlatforms.join(" / "),
@@ -240,6 +240,22 @@ function signalToMatchHotspot(signal: Pick<MatchSignal, "id" | "label" | "minute
     matchReason: `来自${match.name}的关键事件`,
     actionText: "复制选题/生成内容"
   };
+}
+
+function buildOnFieldEventTitle(signal: Pick<MatchSignal, "label" | "minute" | "team" | "evidence">) {
+  let detail = signal.evidence.trim();
+  for (const prefix of [signal.minute, signal.team]) {
+    if (prefix && detail.startsWith(prefix)) detail = detail.slice(prefix.length).trim();
+  }
+  detail = detail
+    .replace(/^(?:进球|点球|换人|黄牌|射门|关键扑救|争议|终场)\s*/, "")
+    .replace(/^([A-Za-zÀ-ÿ.' -]{2,30}),\s*([A-Za-zÀ-ÿ.' -]{2,30})(?=[\u4e00-\u9fff])/, "$2 $1 ")
+    .replace(/[。.!！?？]$/, "")
+    .trim();
+
+  const eventText = detail || signal.label;
+  const teamText = signal.team && !eventText.includes(signal.team) ? `${signal.team}｜` : "";
+  return [signal.minute === "-" ? "" : signal.minute, `${teamText}${eventText}`].filter(Boolean).join(" ");
 }
 
 function getMatchReason(text: string, match: MatchData) {

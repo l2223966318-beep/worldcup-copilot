@@ -145,7 +145,8 @@ function normalizeEventType(type: string, detail = ""): MatchEvent["type"] {
   if (/goal|score/.test(normalized)) return "进球";
   if (/card/.test(normalized)) return "黄牌";
   if (/subst|substitution|change/.test(normalized)) return "换人";
-  if (/save|miss|shot/.test(normalized)) return "关键扑救";
+  if (/save|saved/.test(normalized)) return "关键扑救";
+  if (/miss|shot/.test(normalized)) return "射门";
   return "终场";
 }
 

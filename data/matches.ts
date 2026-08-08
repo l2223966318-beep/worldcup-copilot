@@ -22,7 +22,7 @@ export type KeyPlayer = {
 export type MatchEvent = {
   minute: string;
   team: string;
-  type: "进球" | "点球" | "换人" | "黄牌" | "关键扑救" | "争议" | "终场";
+  type: "进球" | "点球" | "换人" | "黄牌" | "射门" | "关键扑救" | "争议" | "终场";
   description: string;
 };
 
