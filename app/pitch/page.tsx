@@ -216,13 +216,14 @@ export default function PitchPage() {
           <div className="pitch-context-layout pitch-reveal">
             <div className="pitch-context-copy">
               <p className="pitch-eyebrow">B站内容运营实习观察 / 个人实践项目</p>
-              <h2>这些工作材料，<br /><span className="pitch-context-title-line">催生了这个工具。</span></h2>
-              <p className="pitch-context-lead">世界杯内容生产中，热点日报、赛后复盘和趋势观察暴露出三个连续问题。</p>
-              <div className="pitch-context-signals">
-                {backgroundSignals.map(([number, title, body]) => (
-                  <div key={number}>
+              <h2>内容机会很多，<br /><span className="pitch-context-title-line">判断时间很少。</span></h2>
+              <p className="pitch-context-lead">世界杯期间，热点日报、赛后复盘与内容趋势观察暴露出三个连续问题。</p>
+              <div className="pitch-context-flow" aria-label="内容生产问题链路">
+                {backgroundSignals.map(([number, title, body], index) => (
+                  <div className="pitch-context-flow-step" key={number}>
                     <span>{number}</span>
                     <div><strong>{title}</strong><p>{body}</p></div>
+                    {index < backgroundSignals.length - 1 ? <i aria-hidden="true" /> : null}
                   </div>
                 ))}
               </div>

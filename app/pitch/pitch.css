@@ -431,7 +431,7 @@
   align-items: center;
   display: grid;
   gap: clamp(36px, 4vw, 72px);
-  grid-template-columns: minmax(330px, 0.72fr) minmax(620px, 1.28fr);
+  grid-template-columns: minmax(390px, 0.8fr) minmax(600px, 1.2fr);
   height: 100%;
   position: relative;
   z-index: 3;
@@ -454,7 +454,7 @@
 
 .pitch-context-copy h2,
 .pitch-handoff-copy h2 {
-  font-size: clamp(44px, 3.6vw, 64px);
+  font-size: clamp(48px, 3.9vw, 68px);
   font-weight: 900;
   line-height: 1.03;
   margin: 0;
@@ -466,46 +466,76 @@
 
 .pitch-context-lead {
   color: rgba(255, 255, 255, 0.76);
-  font-size: 16px;
-  line-height: 1.75;
-  margin: 18px 0 0;
+  font-size: 17px;
+  line-height: 1.7;
+  margin: 20px 0 0;
   max-width: 650px;
 }
 
-.pitch-context-signals {
+.pitch-context-flow {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 24px;
+  margin-top: 26px;
 }
 
-.pitch-context-signals > div {
+.pitch-context-flow-step {
   align-items: flex-start;
-  border-top: 1px solid rgba(255, 255, 255, 0.18);
   display: grid;
-  gap: 14px;
-  grid-template-columns: 28px 1fr;
-  padding-top: 10px;
+  gap: 17px;
+  grid-template-columns: 42px 1fr;
+  min-height: 76px;
+  padding-bottom: 15px;
+  position: relative;
 }
 
-.pitch-context-signals span {
-  color: var(--pitch-orange);
+.pitch-context-flow-step > span {
+  align-items: center;
+  border: 1px solid rgba(216, 171, 82, 0.72);
+  color: var(--pitch-gold);
+  display: inline-flex;
   font-family: Arial, sans-serif;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 900;
-  padding-top: 2px;
+  height: 42px;
+  justify-content: center;
+  position: relative;
+  width: 42px;
+  z-index: 2;
 }
 
-.pitch-context-signals strong {
+.pitch-context-flow-step > i {
+  background: linear-gradient(var(--pitch-gold), rgba(216, 171, 82, 0.18));
+  height: 34px;
+  left: 20px;
+  position: absolute;
+  top: 42px;
+  width: 1px;
+}
+
+.pitch-context-flow-step > i::after {
+  border-bottom: 1px solid var(--pitch-gold);
+  border-right: 1px solid var(--pitch-gold);
+  bottom: 1px;
+  content: "";
+  height: 5px;
+  left: -2px;
+  position: absolute;
+  transform: rotate(45deg);
+  width: 5px;
+}
+
+.pitch-context-flow-step strong {
   display: block;
-  font-size: 15px;
+  font-size: 19px;
+  line-height: 1.2;
+  padding-top: 1px;
 }
 
-.pitch-context-signals p {
-  color: rgba(255, 255, 255, 0.68);
-  font-size: 12px;
+.pitch-context-flow-step p {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
   line-height: 1.55;
-  margin: 4px 0 0;
+  margin: 7px 0 0;
 }
 
 .pitch-context-conclusion {
@@ -922,8 +952,11 @@
   .pitch-context-copy h2,
   .pitch-handoff-copy h2 { font-size: 54px; }
   .pitch-context-lead { margin-top: 13px; }
-  .pitch-context-signals { gap: 8px; margin-top: 15px; }
-  .pitch-context-signals > div { padding-top: 7px; }
+  .pitch-context-flow { margin-top: 18px; }
+  .pitch-context-flow-step { min-height: 64px; padding-bottom: 9px; }
+  .pitch-context-flow-step > i { height: 22px; }
+  .pitch-context-flow-step strong { font-size: 17px; }
+  .pitch-context-flow-step p { font-size: 12px; margin-top: 4px; }
   .pitch-context-conclusion { margin-top: 14px; }
   .pitch-material-stage { height: 310px; }
   .pitch-material-tabs button { min-height: 40px; }

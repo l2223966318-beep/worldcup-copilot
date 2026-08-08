@@ -22,6 +22,8 @@ for (const image of ["background-hot-daily", "background-bilibili-cases", "backg
 
 assert.match(page, /className="pitch-material-viewer"/, "project background must present sources in a visible material viewer");
 assert.match(page, /放大查看/, "background materials must support focused viewing");
+assert.match(page, /内容机会很多[\s\S]*判断时间很少/, "project background must use the approved opportunity-window statement");
+assert.match(page, /className="pitch-context-flow"/, "project background must present the three problems as a clear flow");
 assert.doesNotMatch(page, /pitch-context-media|pitch-context-shade/, "project materials must not be dimmed decorative backgrounds");
 assert.doesNotMatch(page, /match-center|match-detail|topic-engine|signals\.png|review\.png|report\.png|stadium\.png|trophy\.png/, "retired presentation imagery must not remain referenced");
 assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/, "pitch page must respect reduced-motion preferences");
