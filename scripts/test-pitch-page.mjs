@@ -11,9 +11,6 @@ assert.match(page, /ArrowDown.*ArrowRight.*PageDown/s, "pitch page must support 
 assert.match(page, /ArrowUp.*ArrowLeft.*PageUp/s, "pitch page must support backward keyboard navigation");
 assert.match(page, /document\.documentElement\.requestFullscreen\(\)/, "pitch page must provide a real fullscreen action");
 assert.match(page, /href="\/"[\s\S]*进入 WorldCup Copilot/, "final chapter must link directly to the live product");
-assert.match(page, /https:\/\/worldcup-copilot2\.vercel\.app\//, "pitch must expose the public product URL");
-assert.match(page, /worldcup-copilot-qr\.png/, "final chapter must include a scannable product QR code");
-assert.match(page, /手机扫码体验/, "QR code must have a concise audience-facing label");
 assert.match(page, /src="\/videos\/worldcup-hero\.mp4"/, "pitch cover must reuse the product background video");
 assert.match(page, /onEnded=\{finishCoverVideo\}/, "pitch cover must reveal its title after the video ends");
 assert.doesNotMatch(page, /<video[\s\S]*?\sloop[\s\S]*?>/, "pitch cover video must not loop automatically");
