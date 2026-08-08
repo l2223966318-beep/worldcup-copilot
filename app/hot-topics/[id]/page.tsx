@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { ArrowLeft, CheckCircle2, Clipboard, ExternalLink, Save, ShieldCheck, Sparkles } from "lucide-react";
 
@@ -368,16 +368,15 @@ export default function HotTopicDetailPage() {
 
       <section className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
         <Panel title="生成结果编辑区">
-          <textarea
+          <FormattedDraftEditor
             value={draft}
-            onChange={(event) => {
-              setDraft(event.target.value);
+            onChange={(value) => {
+              setDraft(value);
               setAudit(null);
               setAuditStatus("idle");
               setAuditMessage("");
             }}
             placeholder="点击“生成内容”后，结果会出现在这里。你也可以直接粘贴或手动编辑文案，再一键审核。"
-            className="mt-5 min-h-[320px] w-full rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-700 outline-none transition focus:border-emerald-300 focus:bg-white"
           />
           <div className="mt-4 flex flex-wrap gap-3">
             <ActionButton onClick={() => draft && copyText(draft, "draft")} icon={<Clipboard className="h-4 w-4" />}>{copied === "draft" ? "已复制" : "复制"}</ActionButton>
@@ -447,6 +446,68 @@ function EmptyCard({ children }: { children: ReactNode }) {
       {children}
     </div>
   );
+}
+
+function FormattedDraftEditor({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) {
+  const editorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || document.activeElement === editor) return;
+    renderDraftLines(editor, value);
+  }, [value]);
+
+  return (
+    <div
+      ref={editorRef}
+      contentEditable
+      suppressContentEditableWarning
+      role="textbox"
+      aria-label="生成结果编辑区"
+      aria-multiline="true"
+      data-placeholder={placeholder}
+      onPaste={(event) => {
+        event.preventDefault();
+        document.execCommand("insertText", false, event.clipboardData.getData("text/plain"));
+      }}
+      onBlur={(event) => onChange(readDraftText(event.currentTarget))}
+      className="mt-5 min-h-[320px] max-h-[520px] w-full overflow-y-auto whitespace-pre-wrap rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-700 outline-none transition empty:before:pointer-events-none empty:before:text-slate-400 empty:before:content-[attr(data-placeholder)] focus:border-emerald-300 focus:bg-white"
+    />
+  );
+}
+
+function renderDraftLines(editor: HTMLDivElement, value: string) {
+  if (!value) {
+    editor.replaceChildren();
+    return;
+  }
+  const fragment = document.createDocumentFragment();
+  value.split("\n").forEach((line) => {
+    const row = document.createElement("div");
+    row.className = isDraftTitleLine(line)
+      ? "font-bold text-slate-950"
+      : "font-normal text-slate-700";
+    if (line) row.textContent = line;
+    else row.append(document.createElement("br"));
+    fragment.append(row);
+  });
+  editor.replaceChildren(fragment);
+}
+
+function readDraftText(editor: HTMLDivElement) {
+  return editor.innerText
+    .replace(/\u00a0/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function isDraftTitleLine(line: string) {
+  const text = line.trim().replace(/^#{1,6}\s*/, "");
+  if (!text) return false;
+  if (/^(?:【[^】]+】|\[[^\]]+\])$/.test(text)) return true;
+  if (/^(?:\d+[.、]\s*)?(?:角度标题|标题|主标题|封面标题|视频标题|选题|话题|小标题)\s*[：:]/.test(text)) return true;
+  if (/^(?:B站|微博|小红书|抖音|公众号)\s*[：:]/.test(text)) return true;
+  return /^\d+[.、]\s*.{2,80}$/.test(text) && !/^(?:\d+[.、]\s*)?(?:怎么做|说明|风险|依据|素材)[：:]/.test(text);
 }
 
 function Panel({ title, children }: { title: string; children: ReactNode }) {
