@@ -43,16 +43,44 @@ export function HighlightedText({ text }: { text: string }) {
   );
 }
 
-export function ReadableTextBlock({ text, className = "" }: { text: string; className?: string }) {
+export function ReadableTextBlock({
+  text,
+  className = "",
+  emphasizeTitles = false
+}: {
+  text: string;
+  className?: string;
+  emphasizeTitles?: boolean;
+}) {
   const paragraphs = text.split(/\n{2,}/).map((item) => item.trim()).filter(Boolean);
 
   return (
     <div className={`space-y-3.5 text-sm leading-relaxed text-slate-700 ${className}`}>
-      {paragraphs.map((paragraph, index) => (
+      {paragraphs.map((paragraph, index) => emphasizeTitles ? (
+        <div key={`${paragraph}-${index}`} className="space-y-1.5">
+          {paragraph.split("\n").map((line, lineIndex) => (
+            <div
+              key={`${line}-${lineIndex}`}
+              className={`whitespace-pre-wrap ${isGeneratedTitleLine(line) ? "font-bold text-slate-950" : "font-normal text-slate-700"}`}
+            >
+              <HighlightedText text={line} />
+            </div>
+          ))}
+        </div>
+      ) : (
         <p key={`${paragraph}-${index}`} className="whitespace-pre-line">
           <HighlightedText text={paragraph} />
         </p>
       ))}
     </div>
   );
+}
+
+function isGeneratedTitleLine(line: string) {
+  const text = line.trim().replace(/^#{1,6}\s*/, "");
+  if (!text) return false;
+  if (/^(?:【[^】]+】|\[[^\]]+\])$/.test(text)) return true;
+  if (/^(?:\d+[.、]\s*)?(?:角度标题|标题|主标题|封面标题|视频标题|选题|话题|小标题)\s*[：:]/.test(text)) return true;
+  if (/^(?:B站|微博|小红书|抖音|公众号)\s*[：:]/.test(text)) return true;
+  return /^\d+[.、]\s*.{2,100}$/.test(text) && !/^(?:\d+[.、]\s*)?(?:怎么做|说明|风险|依据|素材)[：:]/.test(text);
 }

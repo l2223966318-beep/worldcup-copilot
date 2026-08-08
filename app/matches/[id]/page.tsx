@@ -1200,7 +1200,7 @@ function PlatformPreview({
         </label>
       </div>
       {draft ? (
-        <ReadableTextBlock text={generatedText} className="mt-5 rounded-2xl bg-slate-50 p-5" />
+        <ReadableTextBlock text={generatedText} emphasizeTitles className="mt-5 rounded-2xl bg-slate-50 p-5" />
       ) : null}
     </div>
   );

@@ -17,5 +17,11 @@ assert.match(source, /const AI_WORKFLOW_MAX_ATTEMPTS = 2/);
 assert.match(source, /for \(let attempt = 1; attempt <= AI_WORKFLOW_MAX_ATTEMPTS; attempt \+= 1\)/);
 assert.match(source, /payload\.sourceStatus === "live"/);
 assert.match(source, /setTimeout\(resolve, AI_WORKFLOW_RETRY_DELAY_MS\)/);
+assert.match(source, /<ReadableTextBlock text=\{generatedText\} emphasizeTitles/);
+
+const readableTextSource = readFileSync(new URL("../components/ui/readable-text.tsx", import.meta.url), "utf8");
+assert.match(readableTextSource, /emphasizeTitles\?: boolean/);
+assert.match(readableTextSource, /isGeneratedTitleLine/);
+assert.match(readableTextSource, /font-bold text-slate-950/);
 
 console.log("match platform controls ok");
