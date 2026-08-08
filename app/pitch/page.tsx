@@ -9,6 +9,7 @@ import { ArrowDown, ArrowLeft, ArrowRight, Expand, Pause, Play, RotateCcw, SkipF
 import "./pitch.css";
 
 const chapters = ["开场", "项目背景", "进入工具"] as const;
+const EXPERIENCE_URL = "https://worldcup-copilot2.vercel.app/";
 
 const backgroundSignals = [
   ["01", "热点窗口短", "赛后信息在数小时内集中爆发，人工整理会错过时效。"],
@@ -282,14 +283,25 @@ export default function PitchPage() {
         <section className="pitch-slide pitch-handoff" aria-label="进入工具">
           <SlideHeader number="03" label="LIVE PRODUCT" />
           <div className="pitch-handoff-grid" aria-hidden="true"><span /><span /><span /><span /></div>
-          <div className="pitch-handoff-copy pitch-reveal">
-            <p className="pitch-eyebrow">BACKGROUND → LIVE PRODUCT</p>
-            <h2>背景介绍到这里，<br /><span>接下来直接操作。</span></h2>
-            <p>从一场比赛开始，现场走完热点筛选、选题生成、平台内容、风险审校与 Word 导出。</p>
-            <Link href="/" className="pitch-enter-tool">
-              <span>进入 WorldCup Copilot</span>
-              <ArrowRight aria-hidden="true" />
-            </Link>
+          <div className="pitch-handoff-content pitch-reveal">
+            <div className="pitch-handoff-copy">
+              <p className="pitch-eyebrow">BACKGROUND → LIVE PRODUCT</p>
+              <h2>背景介绍到这里，<br /><span>接下来直接操作。</span></h2>
+              <p>从一场比赛开始，现场走完热点筛选、选题生成、平台内容、风险审校与 Word 导出。</p>
+              <Link href="/" className="pitch-enter-tool">
+                <span>进入 WorldCup Copilot</span>
+                <ArrowRight aria-hidden="true" />
+              </Link>
+            </div>
+            <a className="pitch-qr-card" href={EXPERIENCE_URL} target="_blank" rel="noreferrer" aria-label="扫码或点击体验 WorldCup Copilot">
+              <span>SCAN TO TRY</span>
+              <div className="pitch-qr-frame">
+                <Image src="/pitch/worldcup-copilot-qr.png" alt="WorldCup Copilot 在线体验二维码" width={640} height={640} sizes="240px" />
+              </div>
+              <strong>手机扫码体验</strong>
+              <small>无需登录 · 浏览器直接打开</small>
+              <code>worldcup-copilot2.vercel.app</code>
+            </a>
           </div>
           <div className="pitch-demo-route">比赛机会 → 赛事信号 → 选题生成 → 内容审校 → 报告导出</div>
         </section>

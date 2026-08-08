@@ -804,14 +804,23 @@
 .pitch-handoff-grid span:nth-child(3) { top: 33%; }
 .pitch-handoff-grid span:nth-child(4) { top: 66%; }
 
+.pitch-handoff-content {
+  align-items: center;
+  display: grid;
+  gap: clamp(48px, 7vw, 120px);
+  grid-template-columns: minmax(0, 1fr) 300px;
+  height: 100%;
+  position: relative;
+  width: 100%;
+  z-index: 2;
+}
+
 .pitch-handoff-copy {
   display: flex;
   flex-direction: column;
-  height: 100%;
   justify-content: center;
-  max-width: 900px;
+  max-width: 820px;
   position: relative;
-  z-index: 2;
 }
 
 .pitch-handoff-copy h2 span {
@@ -832,6 +841,70 @@
   margin-top: 34px;
   padding: 0 28px;
   width: fit-content;
+}
+
+.pitch-qr-card {
+  align-items: center;
+  background: rgba(248, 249, 244, 0.98);
+  border: 1px solid rgba(216, 171, 82, 0.62);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  color: #06100d;
+  display: flex;
+  flex-direction: column;
+  justify-self: end;
+  padding: 18px 18px 20px;
+  text-decoration: none;
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  width: 286px;
+}
+
+.pitch-qr-card:hover {
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(216, 171, 82, 0.3);
+  transform: translateY(-2px) scale(1.01);
+}
+
+.pitch-qr-card > span {
+  align-self: stretch;
+  border-bottom: 1px solid rgba(6, 16, 13, 0.12);
+  color: #0b8f4d;
+  font-family: Arial, sans-serif;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  padding-bottom: 11px;
+  text-align: left;
+}
+
+.pitch-qr-frame {
+  background: #fff;
+  margin-top: 16px;
+  padding: 8px;
+  width: 232px;
+}
+
+.pitch-qr-frame img {
+  display: block;
+  height: auto;
+  image-rendering: pixelated;
+  width: 100%;
+}
+
+.pitch-qr-card strong {
+  font-size: 19px;
+  margin-top: 13px;
+}
+
+.pitch-qr-card small {
+  color: rgba(6, 16, 13, 0.62);
+  font-size: 11px;
+  margin-top: 5px;
+}
+
+.pitch-qr-card code {
+  color: rgba(6, 16, 13, 0.52);
+  font-family: Arial, sans-serif;
+  font-size: 10px;
+  margin-top: 10px;
 }
 
 .pitch-demo-route {
@@ -998,9 +1071,11 @@
   .pitch-material-modal-image { height: calc(100dvh - 108px); min-height: 0; }
 
   .pitch-handoff { min-height: 760px; padding-top: 150px; }
-  .pitch-handoff-copy { height: auto; justify-content: flex-start; }
+  .pitch-handoff-content { align-items: flex-start; display: flex; flex-direction: column; gap: 36px; height: auto; }
+  .pitch-handoff-copy { justify-content: flex-start; }
   .pitch-handoff-copy > p:not(.pitch-eyebrow) { font-size: 15px; }
   .pitch-enter-tool { font-size: 15px; height: 56px; padding: 0 20px; }
+  .pitch-qr-card { justify-self: auto; width: min(286px, 100%); }
   .pitch-demo-route { bottom: 34px; left: 24px; line-height: 1.7; right: 24px; }
   .pitch-progress,
   .pitch-footer { display: none; }
